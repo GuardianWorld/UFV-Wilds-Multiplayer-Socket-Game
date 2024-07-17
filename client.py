@@ -43,8 +43,8 @@ def is_alive(client_socket):
 
 def client_handler(client_socket):
     try:
+        print("Enter a message: ", end='', flush=True)
         while not stop_event.is_set():
-            print("Enter a message: ", end='', flush=True)
             ready, _, _ = select.select([sys.stdin], [], [], 1)
             if ready:
                 message = sys.stdin.readline().strip()
@@ -55,6 +55,7 @@ def client_handler(client_socket):
                     if(message == "exit"):
                         stop_event.set()
                         break
+                print("Enter a message: ", end='', flush=True)
     except KeyboardInterrupt:
         print("\n[*] User interruption.")
     except Exception as e:
