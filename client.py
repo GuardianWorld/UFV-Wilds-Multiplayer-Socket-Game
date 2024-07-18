@@ -4,7 +4,6 @@ import threading
 import json
 import socket
 import sys
-from multiprocessing import Process
 from time import sleep
 
 stop_event = multiprocessing.Event()
