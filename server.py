@@ -40,6 +40,7 @@ def start_server(host, port):
 def shutdown_server():
     print("[*] Shutting down server.")
     stop_event.set()
+    time.sleep(5)
     for active_socket in active_sockets:
         active_socket.close()
     sys.exit(0)
@@ -56,14 +57,19 @@ def handle_client(client_socket, client_address):
     if not client_socket:
         return
     
+    client_socket.settimeout(3.0)
+    
     try:
         while not stop_event.is_set():
-            request = client_socket.recv(1024)
-            if not request:
-                break
-            message = request.decode()
-            response = handle_response(message)
-            client_socket.send(json.dumps(response).encode())
+            try:
+                request = client_socket.recv(1024)
+                if not request:
+                    break
+                message = request.decode()
+                response = handle_response(message)
+                client_socket.send(json.dumps(response).encode())
+            except socket.timeout:
+                continue
     except Exception as e:
         print(f"Error: {e}")
     finally:
@@ -74,7 +80,7 @@ def handle_client(client_socket, client_address):
 def handle_response(message):
 
     if(message == "ping"):
-        print("ping")
+        #print("ping")
         return {"status": 200}
     
 
@@ -91,11 +97,11 @@ def internal_server_terminal():
     print("[*] Server terminal started.")
     try:
         while not stop_event.is_set():
-            command = input("Enter a command: ")
+            command = input("")
             if command == "shutdown":
                 shutdown_server()
             if command == "status":
-                number_of_sockets = len(threading.enumerate())
+                number_of_sockets = len(active_sockets)
                 print("[*]Server is running.")
                 print(f"[*]Number of sockets open: {number_of_sockets}")
                 print(f"[*] Active connections: {active_connections}")

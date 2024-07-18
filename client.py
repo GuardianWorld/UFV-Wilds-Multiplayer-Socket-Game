@@ -25,18 +25,18 @@ def is_alive(client_socket):
             sleep(3.0)
         except socket.timeout:
             if(tries == 3):
-                print("[*] Connection Lost.")
+                print("\n[*] Connection Lost.")
                 stop_event.set()
                 break
             print("[*] Server not responding, retrying {}/3".format(tries))
             tries += 1
             continue
         except BrokenPipeError:
-            print("[*] Connection Lost.")
+            print("\n[*] Connection Lost.")
             stop_event.set()
             break
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"\nError: {e}")
             stop_event.set()
             break
 
