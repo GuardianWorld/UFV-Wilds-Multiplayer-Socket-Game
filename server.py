@@ -15,7 +15,7 @@ stop_event = threading.Event()
 #Signal Handling
 def signal_handler(sig, frame):
     print(f"[*] Signal received: {sig}. Shutting down...")
-    shutdown_server(3)
+    shutdown_server(5)
 
 signal.signal(signal.SIGTERM, signal_handler)
 
@@ -37,8 +37,8 @@ def start_server(host, port):
 
     print(f"[*] Listening on {host}:{port}")
 
-    terminal = threading.Thread(target=internal_server_terminal)
-    terminal.start()
+    #terminal = threading.Thread(target=internal_server_terminal)
+    #terminal.start()
     while not stop_event.is_set():
         try:
             client_socket, client_address = server_socket.accept()
@@ -47,7 +47,7 @@ def start_server(host, port):
         except socket.timeout:
             continue
     
-    terminal.join()
+    #terminal.join()
     server_socket.close()
 
 #Shutdown Server

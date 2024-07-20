@@ -18,8 +18,10 @@ class HotReloader:
 
         def on_modified(self, event):
             if event.src_path.endswith('.py'):
-                print(f"[HotReloader] Detected change in {event.src_path}")
-                self.reloader.restart_process()
+                #if the file being executed is the same as the event
+                if event.src_path == self.reloader.script:
+                    print(f"[HotReloader] Detected change in {event.src_path}")
+                    self.reloader.restart_process()
 
     def start_process(self):
         print(f"[HotReloader] Starting {self.script}")

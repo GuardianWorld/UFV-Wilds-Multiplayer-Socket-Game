@@ -64,10 +64,9 @@ def validate_token(token):
         return None, {"status": 401, "message": "Invalid token", "command": "none"}
 
 def generate_token(user_id):
-    print(user_id)
     payload = {
         'user_id': user_id,
-        'exp': datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=3) 
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=3) 
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
     return token

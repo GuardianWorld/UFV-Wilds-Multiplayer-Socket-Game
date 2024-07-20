@@ -42,7 +42,7 @@ def is_alive(client_socket):
             stop_event.set()
             break
 
-def package_message(message, token):
+def package_message(message, token="none"):
     full_message = message.split(' ', 1)
     command = full_message[0]
     json_message = {}
@@ -51,6 +51,9 @@ def package_message(message, token):
     if(command == "exit"):
         json_message = {"token": token, "message": message, "command": "logoff"}
     elif(command == "register"):
+        if(token):
+            json_message = {"token": token, "message": "Already logged in", "command": "error"}
+            send_status = False
         try:
             parts = message.split(' ', 2)
             if(len(parts) != 3):
@@ -63,19 +66,23 @@ def package_message(message, token):
             json_message = {"token": token, "message": f"Error: {e}", "command": "error"}
             send_status = False
     elif(command == "login"):
-        try:
-            parts = message.split(' ', 2)
-            if(len(parts) != 3):
-                json_message = {"token": token, "message": "Invalid input", "command": "error"}
-                send_status = False
-            
-            username = parts[1]
-            password = parts[2]
-            print(f"[*] Logging in as {username}")
-            json_message = {"token": token, "message": "requesting login", "command": "login", "username": username, "password": password}
-        except Exception as e:
-            json_message = {"token": token, "message": f"Error: {e}", "command": "error"}
+        if(token):
+            json_message = {"token": token, "message": "Already logged in", "command": "error"}
             send_status = False
+        else:
+            try:
+                parts = message.split(' ', 2)
+                if(len(parts) != 3):
+                    json_message = {"token": token, "message": "Invalid input", "command": "error"}
+                    send_status = False
+                
+                username = parts[1]
+                password = parts[2]
+                print(f"[*] Logging in as {username}")
+                json_message = {"token": token, "message": "requesting login", "command": "login", "username": username, "password": password}
+            except Exception as e:
+                json_message = {"token": token, "message": f"Error: {e}", "command": "error"}
+                send_status = False
     else:
         json_message = {"token": token, "message": message, "command": "chat"}
     
@@ -95,7 +102,14 @@ def handle_response(_data):
     
     return command, message
 
-        
+
+def receive_message(client_socket):
+    response = client_socket.recv(1024)
+    print(response)
+    command, data = handle_response(response.decode())
+    return command, data
+
+
 
 def client_handler(client_socket):
     token = ""
@@ -114,14 +128,12 @@ def client_handler(client_socket):
                     client_socket.send(package.encode())
 
                     response = client_socket.recv(1024)
+                    print(response)
                     command, data = handle_response(response.decode())
+
 
                     if(command == "login"):
                         token = data
-
-
-                    if(token):
-                        print(token)
                     if(message == "exit"):
                         stop_event.set()
                         break
@@ -146,6 +158,7 @@ def start_client(host, port):
     alive_process.start()
     client_handler_tread = threading.Thread(target=client_handler, args=(client_socket,))
     client_handler_tread.start()
+
 
     while not stop_event.is_set() and client_handler_tread.is_alive():
         sleep(1)
