@@ -52,7 +52,7 @@ def start_server(host, port):
 
 #Shutdown Server
 def shutdown_server(timeout=5):
-    print("[*] Shutting down server in 10 seconds.")
+    print(f"[*] Shutting down server in {timeout} seconds.")
     stop_event.set()
     time.sleep(timeout)
     for active_socket in active_sockets:

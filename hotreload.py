@@ -18,13 +18,15 @@ class HotReloader:
 
         def on_modified(self, event):
             if event.src_path.endswith('.py'):
-                print(f"Detected change in {event.src_path}, restarting process...")
+                print(f"[HotReloader] Detected change in {event.src_path}")
                 self.reloader.restart_process()
 
     def start_process(self):
+        print(f"[HotReloader] Starting {self.script}")
         return subprocess.Popen([sys.executable, self.script])
 
     def restart_process(self):
+        print(f"[HotReloader] Restarting {self.script}")
         self.process.terminate()
         self.process.wait()
         self.process = self.start_process()
@@ -32,7 +34,7 @@ class HotReloader:
     def start(self):
         self.observer.schedule(self.event_handler, path='.', recursive=True)
         self.observer.start()
-        print(f"Watching for changes in {self.script}...")
+        print(f"[HotReloader] Watching for changes in {self.script}...")
 
         try:
             while True:
