@@ -1,5 +1,6 @@
 import multiprocessing
 import select
+import string
 import threading
 import json
 import socket
@@ -18,7 +19,8 @@ def is_alive(client_socket):
     while not stop_event.is_set():
         try:
             client_socket.settimeout(timeout)
-            client_socket.send("ping".encode())
+            message = json.dumps({"token": "none", "message": "ping", "command": "ping"})
+            client_socket.send(message.encode())
             response = client_socket.recv(1024)
             client_socket.settimeout(None)
             tries = 0
@@ -40,7 +42,63 @@ def is_alive(client_socket):
             stop_event.set()
             break
 
+def package_message(message, token):
+    full_message = message.split(' ', 1)
+    command = full_message[0]
+    json_message = {}
+    send_status = True
+
+    if(command == "exit"):
+        json_message = {"token": token, "message": message, "command": "logoff"}
+    elif(command == "register"):
+        try:
+            parts = message.split(' ', 2)
+            if(len(parts) != 3):
+                json_message = {"token": token, "message": "Invalid input", "command": "error"}
+                send_status = False
+            username = parts[1]
+            password = parts[2]
+            json_message = {"token": token, "message": "requesting registration", "command": "register", "username": username, "password": password}
+        except Exception as e:
+            json_message = {"token": token, "message": f"Error: {e}", "command": "error"}
+            send_status = False
+    elif(command == "login"):
+        try:
+            parts = message.split(' ', 2)
+            if(len(parts) != 3):
+                json_message = {"token": token, "message": "Invalid input", "command": "error"}
+                send_status = False
+            
+            username = parts[1]
+            password = parts[2]
+            print(f"[*] Logging in as {username}")
+            json_message = {"token": token, "message": "requesting login", "command": "login", "username": username, "password": password}
+        except Exception as e:
+            json_message = {"token": token, "message": f"Error: {e}", "command": "error"}
+            send_status = False
+    else:
+        json_message = {"token": token, "message": message, "command": "chat"}
+    
+    return send_status, json_message
+
+def handle_response(_data):
+    data = json.loads(_data)
+    status = data.get('status')
+    message = data.get('message')
+    command = data.get('command')
+    print(f"[*] {status} : {message} : {command}")
+
+    if(command == "login"):
+        token = data.get('token')
+        print(token)
+        return command, token
+    
+    return command, message
+
+        
+
 def client_handler(client_socket):
+    token = ""
     try:
         print("Enter a message: ", end='', flush=True)
         while not stop_event.is_set():
@@ -48,9 +106,22 @@ def client_handler(client_socket):
             if ready:
                 message = sys.stdin.readline().strip()
                 if(message):
-                    client_socket.send(message.encode())
+                    send_status, packed_message = package_message(message, token)
+                    if not send_status:
+                        print(packed_message)
+                        continue
+                    package = json.dumps(packed_message)
+                    client_socket.send(package.encode())
+
                     response = client_socket.recv(1024)
-                    print(f"Received: {response}")
+                    command, data = handle_response(response.decode())
+
+                    if(command == "login"):
+                        token = data
+
+
+                    if(token):
+                        print(token)
                     if(message == "exit"):
                         stop_event.set()
                         break
@@ -77,7 +148,7 @@ def start_client(host, port):
     client_handler_tread.start()
 
     while not stop_event.is_set() and client_handler_tread.is_alive():
-        pass
+        sleep(1)
 
     
     if(client_handler_tread.is_alive()):
