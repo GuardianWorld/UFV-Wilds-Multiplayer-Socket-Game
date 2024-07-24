@@ -1,10 +1,13 @@
+import base64
 import datetime
+import os
 import sqlite3
 import hashlib
 import json
 import jwt
 
 SECRET_KEY = "UFV_WILDS_DEV"
+CARD_FOLDER = "CARDS"
 
 # Init
 def init_db():
@@ -14,7 +17,10 @@ def init_db():
               id INTEGER PRIMARY KEY, 
               username TEXT UNIQUE, 
               password TEXT, 
-              admin INTEGER)''')
+              admin INTEGER,
+              matches INTEGER,
+              matches_won INTEGER)''')
+    
     c.execute('''CREATE TABLE IF NOT EXISTS card (
               id INTEGER PRIMARY KEY, 
               card_name TEXT, 
@@ -25,17 +31,21 @@ def init_db():
               tamanho TEXT, 
               idade TEXT, 
               tipo TEXT, 
-              imagem BLOB, 
+              imagem TEXT, 
               last_modified TEXT)''')
+    
     c.execute('''CREATE TABLE IF NOT EXISTS user_cards (
               id INTEGER PRIMARY KEY, 
               user_id INTEGER, 
               card_id INTEGER)''')
+    
     c.execute('''CREATE TABLE IF NOT EXISTS decks (
               id INTEGER PRIMARY KEY, 
               deck_name TEXT,
               user_id INTEGER)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS deck_cards (id INTEGER PRIMARY KEY, 
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS deck_cards (
+              id INTEGER PRIMARY KEY, 
               deck_id INTEGER, 
               card_id INTEGER)''')
 
@@ -84,7 +94,7 @@ def add_user(username, password):
         print(f"[*] Logging in as {username}")
         print(f"[*] Password: {password}")
         hashed_password = hash_password(password)
-        c.execute('''INSERT INTO users (username, password, admin) VALUES (?, ?, ?)''', (username, hashed_password, 0))
+        c.execute('''INSERT INTO users (username, password, admin, matches, matches_won) VALUES (?, ?, ?, ?, ?)''', (username, hashed_password, 0, 0, 0))
         conn.commit()
         conn.close()
         return {"status": 200, "message": "Success", "command": "register"}
@@ -115,7 +125,6 @@ def add_card(_data):
         user_id, status = validate_token(data.get('token'))
         if status.get('status') != 200:
             return status
-
         conn, c = get_db_connection()
 
         is_admin = c.execute('''SELECT admin FROM users WHERE id = ?''', (user_id,)).fetchone()
@@ -123,6 +132,7 @@ def add_card(_data):
             conn.close()
             return {"status": 401, "message": "User is not an admin"}
         
+        card_name = data.get('card_name')
         card_group = data.get('card_group')
         forca = data.get('forca')
         fofura = data.get('fofura')
@@ -131,14 +141,134 @@ def add_card(_data):
         idade = data.get('idade')
         tipo = data.get('tipo')
         imagem = data.get('imagem')
+        last_modified = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        c.execute('''INSERT INTO cards (card_group, forca, fofura, velocidade, tamanho, idade, tipo, imagem)''', (card_group,forca,fofura, velocidade, tamanho, idade, tipo, imagem))
+
+        image_path = save_image_to_file(imagem, card_name)
+
+
+        c.execute('''INSERT INTO cards (
+                   card_name,
+                   card_group,
+                   forca,
+                   fofura,
+                   velocidade,
+                   tamanho,
+                   idade,
+                   tipo,
+                   imagem,
+                   last_modified)''', (card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, image_path, last_modified))
 
         conn.commit()
         conn.close()
         return {"status": 200, "message": "Success", "command": "none"}
     except Exception as e:
         return {"status": 500, "message": "failure to add card", "command": "none"}
+
+def get_card(_data):
+    try:
+        data = json.loads(_data)
+        user_id, status = validate_token(data.get('token'))
+        if status.get('status') != 200:
+            return status
+        card_id = data.get('card_id')
+        card = get_card_by_id(card_id)
+        return {"status": 200, "message": "Success", "command": "get_card", "card": card}
+    except Exception as e:
+        return {"status": 500, "message": "failure to get card", "command": "none"}
+
+def edit_card(_data):
+    try:
+        data = json.loads(_data)
+        user_id, status = validate_token(data.get('token'))
+        if status.get('status') != 200:
+            return status
+        conn, c = get_db_connection()
+
+        is_admin = c.execute('''SELECT admin FROM users WHERE id = ?''', (user_id,)).fetchone()
+        if is_admin != 1:
+            conn.close()
+            return {"status": 401, "message": "User is not an admin"}
+        
+        card_id = data.get('card_id')
+
+        old_values = get_card_by_id(card_id)
+
+        card_name = data.get('card_name')
+        card_group = data.get('card_group')
+        forca = data.get('forca')
+        fofura = data.get('fofura')
+        velocidade = data.get('velocidade')
+        tamanho = data.get('tamanho')
+        idade = data.get('idade')
+        tipo = data.get('tipo')
+        imagem = data.get('imagem')
+        last_modified = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        if(card_name == ""):
+            card_name = old_values[1]
+        if(card_group == ""):
+            card_group = old_values[2]
+        if(forca == ""):
+            forca = old_values[3]
+        if(fofura == ""):
+            fofura = old_values[4]
+        if(velocidade == ""):
+            velocidade = old_values[5]
+        if(tamanho == ""):
+            tamanho = old_values[6]
+        if(idade == ""):
+            idade = old_values[7]
+        if(tipo == ""):
+            tipo = old_values[8]
+        if(imagem == ""):
+            image_path = old_values[9]
+        else:
+            image_path = save_image_to_file(imagem, card_name)
+
+        c.execute('''UPDATE cards SET
+                   card_name = ?,
+                   card_group = ?,
+                   forca = ?,
+                   fofura = ?,
+                   velocidade = ?,
+                   tamanho = ?,
+                   idade = ?,
+                   tipo = ?,
+                   imagem = ?,
+                   last_modified = ?
+                   WHERE id = ?''', (card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, image_path, last_modified, card_id))
+
+        conn.commit()
+        conn.close()
+        return {"status": 200, "message": "Success", "command": "none"}
+    except Exception as e:
+        return {"status": 500, "message": "failure to edit card", "command": "none"}
+
+def delete_card(_data):
+    try:
+        data = json.loads(_data)
+        user_id, status = validate_token(data.get('token'))
+        if status.get('status') != 200:
+            return status
+        conn, c = get_db_connection()
+
+        is_admin = c.execute('''SELECT admin FROM users WHERE id = ?''', (user_id,)).fetchone()
+        if is_admin != 1:
+            conn.close()
+            return {"status": 401, "message": "User is not an admin"}
+        
+        card_id = data.get('card_id')
+
+        c.execute('''DELETE FROM cards WHERE id = ?''', (card_id,))
+        c.execute('''DELETE FROM user_cards WHERE card_id = ?''', (card_id,))
+        c.execute('''DELETE FROM deck_cards WHERE card_id = ?''', (card_id,))
+
+        conn.commit()
+        conn.close()
+        return {"status": 200, "message": "Success", "command": "none"}
+    except Exception as e:
+        return {"status": 500, "message": "failure to delete card", "command": "none"}
 
 # Auxiliary Functions
 def get_9_random_cards():
@@ -176,3 +306,12 @@ def get_deck_by_id(deck_id):
     deck = c.execute('''SELECT * FROM decks WHERE id = ?''', (deck_id,)).fetchone()
     conn.close()
     return deck
+
+
+# Card File Functions
+def save_image_to_file(image_base64, card_name):
+    image_data = base64.b64decode(image_base64)
+    file_path = os.path.join(CARD_FOLDER, f"{card_name}.png")
+    with open(file_path, 'wb') as image_file:
+        image_file.write(image_data)
+    return file_path

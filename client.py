@@ -1,3 +1,4 @@
+import base64
 import multiprocessing
 import select
 import string
@@ -102,15 +103,6 @@ def handle_response(_data):
     
     return command, message
 
-
-def receive_message(client_socket):
-    response = client_socket.recv(1024)
-    print(response)
-    command, data = handle_response(response.decode())
-    return command, data
-
-
-
 def client_handler(client_socket):
     token = ""
     try:
@@ -127,7 +119,7 @@ def client_handler(client_socket):
                     package = json.dumps(packed_message)
                     client_socket.send(package.encode())
 
-                    response = client_socket.recv(1024)
+                    response = client_socket.recv(2048)
                     print(response)
                     command, data = handle_response(response.decode())
 
@@ -144,6 +136,52 @@ def client_handler(client_socket):
         print(f"Error: {e}")
 
 
+#Send IMAGES
+def image_to_b64(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+
+def send_image(host, port, token, image_path):
+    try:
+        # Convert the image to base64
+        image_base64 = image_to_b64(image_path)
+
+        # Create the JSON payload
+        payload = {
+            "token": token,
+            "command": "add_card",
+            "card_name": "SampleCard",
+            "card_group": "Group1",
+            "forca": 10,
+            "fofura": 8,
+            "velocidade": 7,
+            "tamanho": 5,
+            "idade": 3,
+            "tipo": "Fire",
+            "imagem": image_base64
+        }
+
+        # Convert the payload to a JSON string
+        payload_json = json.dumps(payload)
+
+        # Establish socket connection
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((host, port))
+        print(f"[*] Connected to {host}:{port}")
+
+        # Send the JSON payload
+        client_socket.sendall(payload_json.encode('utf-8'))
+
+        # Receive the response from the server
+        response = client_socket.recv(4096)
+        print(f"Received: {response.decode('utf-8')}")
+
+        client_socket.close()
+    except Exception as e:
+        print(f"Error: {e}")
+
+#Start Client
 def start_client(host, port):
     try:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

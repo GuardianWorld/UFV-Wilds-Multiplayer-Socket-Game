@@ -10,6 +10,7 @@ import database
 
 active_connections = []
 active_sockets = []
+looking_for_match = []
 stop_event = threading.Event()
 
 #Signal Handling
@@ -76,11 +77,14 @@ def handle_client(client_socket, client_address):
     try:
         while not stop_event.is_set():
             try:
-                request = client_socket.recv(1024)
+                request = client_socket.recv(4096)
+                if(request['command']):
+                    print(request['command'])
                 if not request:
                     break
                 message = request.decode()
                 response = json.dumps(handle_response(message))
+                print(response)
                 client_socket.send(response.encode())
             except socket.timeout:
                 continue
