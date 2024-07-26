@@ -88,11 +88,17 @@ def get_db_connection():
     return conn, c
 
 #User Functions
-def add_user(username, password):
+
+def get_user_id(username):
     conn, c = get_db_connection()
+    ID = c.execute('''SELECT id FROM users WHERE username = ?''', (username,)).fetchone()
+    conn.close()
+    return ID
+
+
+def add_user(username, password):
     try:
-        print(f"[*] Logging in as {username}")
-        print(f"[*] Password: {password}")
+        conn, c = get_db_connection()
         hashed_password = hash_password(password)
         c.execute('''INSERT INTO users (username, password, admin, matches, matches_won) VALUES (?, ?, ?, ?, ?)''', (username, hashed_password, 0, 0, 0))
         conn.commit()
@@ -100,7 +106,7 @@ def add_user(username, password):
         return {"status": 200, "message": "Success", "command": "register"}
     except Exception as e:
         print(e)
-        return {"status": 500, "message": e, "command": "error"}
+        return {"status": 500, "message": str(e), "command": "error"}
     
 def login_user(username, password):
     try:
@@ -115,7 +121,7 @@ def login_user(username, password):
         else:
             return {"status": 401, "message": "Invalid username or password", "command": "error"}
     except Exception as e:
-        return {"status": 500, "message": e, "command": "error"}
+        return {"status": 500, "message": str(e), "command": "error"}
 
 
 # Card Functions

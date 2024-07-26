@@ -3,15 +3,11 @@ import socket
 import json
 import threading
 import time
+import datetime
 import signal
-import sqlite3
 
 import database
-
-active_connections = []
-active_sockets = []
-looking_for_match = []
-stop_event = threading.Event()
+from config import active_connections, stop_event, logged_users
 
 #Signal Handling
 def signal_handler(sig, frame):
@@ -38,8 +34,8 @@ def start_server(host, port):
 
     print(f"[*] Listening on {host}:{port}")
 
-    #terminal = threading.Thread(target=internal_server_terminal)
-    #terminal.start()
+    terminal = threading.Thread(target=internal_server_terminal)
+    terminal.start()
     while not stop_event.is_set():
         try:
             client_socket, client_address = server_socket.accept()
@@ -48,7 +44,8 @@ def start_server(host, port):
         except socket.timeout:
             continue
     
-    #terminal.join()
+    terminal.join()
+    shutdown_server()
     server_socket.close()
 
 #Shutdown Server
@@ -56,19 +53,43 @@ def shutdown_server(timeout=5):
     print(f"[*] Shutting down server in {timeout} seconds.")
     stop_event.set()
     time.sleep(timeout)
-    for active_socket in active_sockets:
-        active_socket.close()
+    for _, client_socket, _ in active_connections.items():
+        client_socket.close()
     sys.exit(0)
-    
 
+#Internal Server Side
+def internal_server_terminal():
+    print("[*] Server terminal started.")
+    try:
+        while not stop_event.is_set():
+            command = input("")
+            if command == "shutdown":
+                print("[*] Shutdown command issued, stopping...")
+                stop_event.set()
+            if command == "status":
+                number_of_sockets = len(active_connections)
+                print("[*] Server is running.")
+                print(f"[*] Number of sockets open: {number_of_sockets}")
+                print(f"[*] Active connections: ")
+                for connection, socket_time_pair in active_connections.items():
+                    print(f" >> {connection[0]}:{connection[1]} - {socket_time_pair[1]}")
+            if command == "users":
+                number_of_users = len(logged_users)
+                print("[*] Number of Users Online: ", number_of_users)
+                for connection, user in logged_users.items():
+                    print(f" >> {connection[0]}:{connection[1]} [{user}]")
+    except KeyboardInterrupt:
+        print("\n[*] Keyboard interruption.")
+    except Exception as e:
+        print(f"Error: {e}")
+
+    print("[*] Server terminal stopped.")
 
 #Server-Client Side
 
 def handle_client(client_socket, client_address):        
     print(f"[*] Accepted connection from: {client_address[0]}:{client_address[1]}")
-    active_connections.append(client_address)
-    active_sockets.append(client_socket)
-    #time.time()
+    active_connections[client_address] = (client_socket, datetime.datetime.utcnow())
     if not client_socket:
         return
     
@@ -78,80 +99,77 @@ def handle_client(client_socket, client_address):
         while not stop_event.is_set():
             try:
                 request = client_socket.recv(4096)
-                if(request['command']):
-                    print(request['command'])
+                #print(request)
                 if not request:
                     break
-                message = request.decode()
-                response = json.dumps(handle_response(message))
-                print(response)
+                data = json.loads(request.decode())
+                response = json.dumps(handle_response(data, client_address))
                 client_socket.send(response.encode())
             except socket.timeout:
                 continue
     except Exception as e:
         print(f"Error: {e}")
     finally:
-        active_sockets.remove(client_socket)
         client_socket.close()
-        active_connections.remove(client_address)
+        del active_connections[client_address]
+        if client_address in logged_users:
+            del logged_users[client_address]
         print(f"[*] Connection closed from: {client_address[0]}:{client_address[1]}")
 
-def handle_response(_data):
+def handle_response(data, client_address):
 
-    data = json.loads(_data)
     message = data.get('message')
     command = data.get('command')
     token = data.get('token')
+    response = {}
 
     if(command != "ping"):
         print(f"[*] Received: {message}")
 
     if(command == "ping"):
-        #print("ping")
-        return {"status": 200, "message": "pong", "command": "pong"}
+        response = {"status": 200, "message": "pong", "command": "pong"}
     elif(command == "logoff"):
-        return {"status": 200, "message": "Goodbye!", "command": "logoff"}
+        response = {"status": 200, "message": "Goodbye!", "command": "logoff"}
     elif(command == "chat"):
-        return {"status": 200, "message": message, "command": "chat"}
+        response = {"status": 200, "message": message, "command": "chat"}
     elif(command == "register"):
-        username = data.get('username')
-        password = data.get('password')
-        return database.add_user(username, password)
+        response = register(data.get('username'), data.get('password'), client_address)
     elif(command == "login"):
-        username = data.get('username')
-        password = data.get('password')
-        return database.login_user(username, password)
+        response = login(data.get('username'), data.get('password'), client_address)
     else:
-        return {"status": 401, "message": "Invalid Command", "command": "none"}
+        response = {"status": 401, "message": "Invalid Command", "command": "none"}
 
+    return response
 
-#Internal Server Side
-def internal_server_terminal():
-    print("[*] Server terminal started.")
-    try:
-        while not stop_event.is_set():
-            command = input("")
-            if command == "shutdown":
-                shutdown_server()
-            if command == "status":
-                number_of_sockets = len(active_sockets)
-                print("[*] Server is running.")
-                print(f"[*] Number of sockets open: {number_of_sockets}")
-                print(f"[*] Active connections: ")
-                for connection in active_connections:
-                    print(f" >> {connection[0]}:{connection[1]}")
+def check_online_user(username):
+    for connection, user in logged_users.items():
+        if user == username:
+            return True
+    return False
 
-    except KeyboardInterrupt:
-        print("\n[*] Keyboard interruption.")
-    except Exception as e:
-        print(f"Error: {e}")
+def register(username, password, client_address):
+    if(database.get_user_id(username)):
+            return {"status": 500, "message": "User already exists", "command": "error"}
+    else:
+        if(len(password) < 6):
+            return {"status": 500, "message": "Password too short", "command": "error"}
+        
+        return database.add_user(username, password)
 
-    print("[*] Server terminal stopped.")
+def login(username, password, client_address):
+    if(check_online_user(username)):
+        return {"status": 500, "message": "User already logged in", "command": "error"}
+    response = database.login_user(username, password)
+    if(response['status'] == 200):
+        logged_users[client_address] = username
+    
+    return response
+
 
 
 if __name__ == "__main__":
     host = ""
-    port = 25556
+    port = 25555
     if len(sys.argv) == 2:
         port = int(sys.argv[1]) 
     

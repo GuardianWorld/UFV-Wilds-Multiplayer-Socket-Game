@@ -1,4 +1,4 @@
-.PHONY: venv install server_install server_run client_install client_run
+.PHONY: venv install hot_reload server_install server client_install client
 
 VENV_DIR = .venv
 PYTHON = $(VENV_DIR)/bin/python
@@ -10,13 +10,13 @@ venv:
 install: venv
 	$(PIP) install -r requirements.txt
 
-server_run:
+server:
 	$(PYTHON) server/server.py 
 
 hot_reload:
 	$(PYTHON) hotreload.py ./server/server.py
 
-client_run:
+client:
 	$(PYTHON) client.py
 
 server_install: install
