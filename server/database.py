@@ -48,6 +48,17 @@ def init_db():
               id INTEGER PRIMARY KEY, 
               deck_id INTEGER, 
               card_id INTEGER)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS system_config(
+                id INTEGER PRIMARY KEY, 
+                key TEXT, 
+                value TEXT)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS statistics(
+                id INTEGER PRIMARY KEY, 
+                key TEXT, 
+                value INTEGER)''')
+    
 
     conn.commit()
     conn.close()
@@ -125,34 +136,11 @@ def login_user(username, password):
 
 
 # Card Functions
-def add_card(_data):
+def add_card(card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, imagem):
     try:
-        data = json.loads(_data)
-        user_id, status = validate_token(data.get('token'))
-        if status.get('status') != 200:
-            return status
-        conn, c = get_db_connection()
-
-        is_admin = c.execute('''SELECT admin FROM users WHERE id = ?''', (user_id,)).fetchone()
-        if is_admin != 1:
-            conn.close()
-            return {"status": 401, "message": "User is not an admin"}
-        
-        card_name = data.get('card_name')
-        card_group = data.get('card_group')
-        forca = data.get('forca')
-        fofura = data.get('fofura')
-        velocidade = data.get('velocidade')
-        tamanho = data.get('tamanho')
-        idade = data.get('idade')
-        tipo = data.get('tipo')
-        imagem = data.get('imagem')
+        c, conn = get_db_connection()
         last_modified = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-        image_path = save_image_to_file(imagem, card_name)
-
-
+        
         c.execute('''INSERT INTO cards (
                    card_name,
                    card_group,
@@ -163,7 +151,7 @@ def add_card(_data):
                    idade,
                    tipo,
                    imagem,
-                   last_modified)''', (card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, image_path, last_modified))
+                   last_modified)''', (card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, imagem, last_modified))
 
         conn.commit()
         conn.close()

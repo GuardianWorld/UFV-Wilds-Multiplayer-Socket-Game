@@ -5,3 +5,5 @@ logged_users = {}
 searching_for_match = {}
 match_rooms = {}
 stop_event = threading.Event()
+
+log_event_level = 5

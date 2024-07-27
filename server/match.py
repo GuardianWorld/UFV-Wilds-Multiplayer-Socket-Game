@@ -14,11 +14,12 @@ def search_match(player_socket, player_name):
     while not stop_event.is_set():
         for second_player in searching_for_match:
             if second_player != player_name:
-                match_rooms[len(match_rooms)] = {player_name, second_player}
-                del searching_for_match[player_name]
-                del searching_for_match[second_player]
+                match_rooms[len(match_rooms)] = {(player_name, player_socket), (second_player, searching_for_match[second_player])}
                 player_socket.send(json.dumps({"status": 200, "message": "Match found!", "command": "match"}).encode())
                 searching_for_match[second_player].send(json.dumps({"status": 200, "message": "Match found!", "command": "match"}).encode())
+                
+                del searching_for_match[player_name]
+                del searching_for_match[second_player]
         if player_name in match_rooms:
             player_socket.send(json.dumps({"status": 200, "message": "Match found!", "command": "match"}).encode())
             break
