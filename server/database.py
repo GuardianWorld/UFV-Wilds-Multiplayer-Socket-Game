@@ -19,7 +19,7 @@ def init_db():
               password TEXT, 
               admin INTEGER,
               matches INTEGER,
-              matches_won INTEGER
+              matches_won INTEGER,
               banned INTEGER)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS card (
@@ -73,6 +73,13 @@ def init_db():
     c.execute('''UPDATE statistics SET value = (SELECT COUNT(*) FROM card) WHERE key = ?''', ("cards",))
     c.execute('''UPDATE statistics SET value = (SELECT COUNT(*) FROM decks) WHERE key = ?''', ("decks",))
     c.execute('''UPDATE statistics SET value = (SELECT COUNT(*) FROM users WHERE banned = 1) WHERE key = ?''', ("bans",))
+    
+    #Check card amount
+    card_amount = get_statistics_cards()
+    if(card_amount == None):
+        print("[*] No cards found, please add some cards to the database before allowing connections")
+    elif(card_amount[0] < 9):
+        print("[*] Less than 9 cards found, please add some cards to the database before allowing connections")    
 
     conn.commit()
     conn.close()
@@ -168,7 +175,7 @@ def add_user(username, password):
         conn.commit()
         conn.close()
         increment_statistics_users()
-        return {"status": 200, "message": "Success", "command": "register"}
+        return {"status": 200, "message": "Success", "command": "register", "id": get_user_id(username)[0]}
     except Exception as e:
         print(e)
         return {"status": 500, "message": str(e), "command": "error"}
@@ -197,10 +204,10 @@ def login_user(username, password):
 # Card Functions
 def add_card(card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, imagem):
     try:
-        c, conn = get_db_connection()
+        conn, c = get_db_connection()
         last_modified = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        c.execute('''INSERT INTO cards (
+        c.execute('''INSERT INTO card (
                    card_name,
                    card_group,
                    forca,
@@ -210,12 +217,13 @@ def add_card(card_name, card_group, forca, fofura, velocidade, tamanho, idade, t
                    idade,
                    tipo,
                    imagem,
-                   last_modified)''', (card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, imagem, last_modified))
+                   last_modified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, imagem, last_modified))
 
+        
         conn.commit()
         conn.close()
         increment_statistics_cards()
-        return {"status": 200, "message": "Success", "command": "none"}
+        return {"status": 200, "message": "Success", "command": "add_card"}
     except Exception as e:
         return {"status": 500, "message": "failure to add card", "command": "none"}
 
@@ -355,6 +363,24 @@ def delete_card(_data):
         return {"status": 200, "message": "Success", "command": "none"}
     except Exception as e:
         return {"status": 500, "message": "failure to delete card", "command": "none"}
+
+def add_card_to_user(user_id, card_id):
+    try:
+        conn, c = get_db_connection()
+        c.execute('''INSERT INTO user_cards (user_id, card_id) VALUES (?, ?)''', (user_id, card_id))
+        conn.commit()
+        conn.close()
+        return {"status": 200, "message": "Success", "command": "none"}
+    except Exception as e:
+        return {"status": 500, "message": "failure to add card to user", "command": "none"}
+
+def check_user_has_card(user_id, card_id):
+    conn, c = get_db_connection()
+    card = c.execute('''SELECT * FROM user_cards WHERE user_id = ? AND card_id = ?''', (user_id, card_id)).fetchone()
+    conn.close()
+    if card:
+        return True
+    return False
 
 # Statistics Functions
 def get_statistics_user():

@@ -353,8 +353,17 @@ def register(username, password, client_address):
     else:
         if(len(password) < 6):
             return {"status": 500, "message": "Password too short", "command": "error"}
+        cards_9 = database.get_9_random_cards()
+        result = database.add_user(username, password)
         
-        return database.add_user(username, password)
+        # Add the cards to the new user
+        for card in cards_9:
+            database.add_card_to_user(card[0], result['id'])
+        
+        # Add a new deck with the cards.
+        #database.add_deck(result['id'], cards_9)
+        
+        return result
 
 def login(username, password, client_address):
     if(check_online_user(username)):
@@ -432,7 +441,7 @@ def add_test_cards():
     Tipo_dict = {1: "Terrestre", 2: "Voador", 3: "Aquatico"}      
     
     while(True):
-        card_name = "Test Card {0}".format(random.randint(1, 1000))        
+        card_name = "Test Card {0}".format(random.randint(1, 100))        
         forca = random.randint(1, 10)
         fofura = random.randint(1, 10)
         velocidade = random.randint(1, 10)
@@ -446,16 +455,17 @@ def add_test_cards():
             print(f"[*] Card Already Exists {card_name}")
             continue
         else:
-            print(f"[*] Adding Card: {card_name}")
-            print(f"[*] Força: {forca}")
-            print(f"[*] Fofura: {fofura}")
-            print(f"[*] Velocidade: {velocidade}")
-            print(f"[*] Tamanho: {tamanho_dict[tamanho]}")
-            print(f"[*] Idade: {idade_dict[idade]}")
-            print(f"[*] Tipo: {Tipo_dict[tipo]}")
-            print(f"[*] Grupo: {card_group}")
-            print(f"[*] Imagem: {path}\n")
-            database.add_card(card_name, card_group, forca, fofura, velocidade, tamanho_dict[tamanho], idade_dict[idade], Tipo_dict[tipo], path)
+            result = database.add_card(card_name, card_group, forca, fofura, velocidade, tamanho_dict[tamanho], idade_dict[idade], Tipo_dict[tipo], path)
+            if(result['status'] == 200):
+                print(f"[*] Card Added: {card_name}")
+                print(f"[*] Força: {forca}")
+                print(f"[*] Fofura: {fofura}")
+                print(f"[*] Velocidade: {velocidade}")
+                print(f"[*] Tamanho: {tamanho_dict[tamanho]}")
+                print(f"[*] Idade: {idade_dict[idade]}")
+                print(f"[*] Tipo: {Tipo_dict[tipo]}")
+                print(f"[*] Grupo: {card_group}")
+                print(f"[*] Imagem: {path}\n")
             break
         
     
