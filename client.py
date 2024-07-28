@@ -1,5 +1,4 @@
 import base64
-import multiprocessing
 import select
 import string
 import threading
@@ -8,7 +7,7 @@ import socket
 import sys
 from time import sleep
 
-stop_event = multiprocessing.Event()
+stop_event = threading.Event()
 
 def close_connection(client_socket):
     print("[*] Disconnected from server.")
@@ -38,6 +37,8 @@ def is_alive(client_socket):
             print("\n[*] Connection Lost.")
             stop_event.set()
             break
+        except WindowsError:
+            continue
         except Exception as e:
             print(f"\nError: {e}")
             stop_event.set()
@@ -85,32 +86,28 @@ def client_handler(client_socket):
     try:
         if(username):
             print(f"[*] Logged in as {username}")
-        print("Enter a message: ", end='', flush=True)
+        
         while not stop_event.is_set():
-            ready, _, _ = select.select([sys.stdin], [], [], 1)
-            if ready:
-                message = sys.stdin.readline().strip()
-                if(message):
-                    send_status, packed_message = package_message(message, token)
-                    if not send_status:
-                        print(f"[*] {packed_message.get('message')}")
-                        print("Enter a message: ", end='', flush=True)
-                        continue
-                    package = json.dumps(packed_message)
-                    client_socket.send(package.encode())
+            message = input("Enter a message: ")
+            if(message and not stop_event.is_set()):
+                send_status, packed_message = package_message(message, token)
+                if not send_status:
+                    print(f"[*] {packed_message.get('message')}")
+                    continue
+                package = json.dumps(packed_message)
+                client_socket.send(package.encode())
 
-                    response = client_socket.recv(2048)
-                    response = response.decode()
-                    command, data = handle_response(response)
+                response = client_socket.recv(2048)
+                response = response.decode()
+                command, data = handle_response(response)
 
 
-                    if(command == "login"):
-                        token = data
-                        username = packed_message.get('username')
-                    if(message == "exit"):
-                        stop_event.set()
-                        break
-                    print("Enter a message: ", end='', flush=True)
+                if(command == "login"):
+                    token = data
+                    username = packed_message.get('username')
+                if(message == "exit"):
+                    stop_event.set()
+                    break
     except KeyboardInterrupt:
         print("\n[*] User interruption.")
     except Exception as e:
@@ -128,8 +125,8 @@ def start_client(host, port):
     print(f"[*] Connected to {host}:{port}")
 
 
-    alive_process = multiprocessing.Process(target=is_alive, args=(client_socket,))
-    alive_process.start()
+    alive_thread = threading.Thread(target=is_alive, args=(client_socket,))
+    alive_thread.start()
     client_handler_tread = threading.Thread(target=client_handler, args=(client_socket,))
     client_handler_tread.start()
 
@@ -141,7 +138,7 @@ def start_client(host, port):
     if(client_handler_tread.is_alive()):
         client_handler_tread.join()
     
-    alive_process.join()
+    alive_thread.join()
     close_connection(client_socket)
         
 # Aux Functions

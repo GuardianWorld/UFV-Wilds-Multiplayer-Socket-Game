@@ -67,9 +67,12 @@ def init_db():
         c.execute('''INSERT INTO statistics (key, value) VALUES (?, ?)''', ("decks", 0))
         c.execute('''INSERT INTO statistics (key, value) VALUES (?, ?)''', ("matches", 0))
         c.execute('''INSERT INTO statistics (key, value) VALUES (?, ?)''', ("bans", 0))
-    
-    # Update user with BANNED
-    c.execute('''ALTER TABLE users ADD COLUMN banned INTEGER''')
+
+    # Update statistics at the start
+    c.execute('''UPDATE statistics SET value = (SELECT COUNT(*) FROM users) WHERE key = ?''', ("users",))
+    c.execute('''UPDATE statistics SET value = (SELECT COUNT(*) FROM card) WHERE key = ?''', ("cards",))
+    c.execute('''UPDATE statistics SET value = (SELECT COUNT(*) FROM decks) WHERE key = ?''', ("decks",))
+    c.execute('''UPDATE statistics SET value = (SELECT COUNT(*) FROM users WHERE banned = 1) WHERE key = ?''', ("bans",))
 
     conn.commit()
     conn.close()
@@ -119,7 +122,13 @@ def get_user_id(username):
 
 def get_user(username):
     conn, c = get_db_connection()
-    user = c.execute('''SELECT * FROM users WHERE username = ?''', (username,)).fetchone()
+    user = c.execute('''SELECT id, username, matches, matches_won, banned FROM users WHERE username = ?''', (username,)).fetchone()
+    conn.close()
+    return user
+
+def get_user_by_id(user_id):
+    conn, c = get_db_connection()
+    user = c.execute('''SELECT * FROM users WHERE id = ?''', (user_id,)).fetchone()
     conn.close()
     return user
 
@@ -158,6 +167,7 @@ def add_user(username, password):
         c.execute('''INSERT INTO users (username, password, admin, matches, matches_won, banned) VALUES (?, ?, ?, ?, ?, ?)''', (username, hashed_password, 0, 0, 0, 0))
         conn.commit()
         conn.close()
+        increment_statistics_users()
         return {"status": 200, "message": "Success", "command": "register"}
     except Exception as e:
         print(e)
@@ -204,21 +214,54 @@ def add_card(card_name, card_group, forca, fofura, velocidade, tamanho, idade, t
 
         conn.commit()
         conn.close()
+        increment_statistics_cards()
         return {"status": 200, "message": "Success", "command": "none"}
     except Exception as e:
         return {"status": 500, "message": "failure to add card", "command": "none"}
 
-def get_card(_data):
+def get_card_details(_data):
     try:
         data = json.loads(_data)
         user_id, status = validate_token(data.get('token'))
         if status.get('status') != 200:
             return status
-        card_id = data.get('card_id')
-        card = get_card_by_id(card_id)
-        return {"status": 200, "message": "Success", "command": "get_card", "card": card}
+        
+        card_name = data.get('card_name')
+        card = get_card_by_name(card_name)
+        card_group = card[2]
+        forca = card[3]
+        fofura = card[4]
+        velocidade = card[5]
+        tamanho = card[6]
+        idade = card[7]
+        tipo = card[8]
+        # For now, Placeholder
+        imagem = card[9]
+        last_modified = card[10]
+        
+        
+        return {"status": 200, 
+                "message": "Success", 
+                "command": "get_card", 
+                "card_name": card_name, 
+                "card_group": card_group, 
+                "forca": forca, 
+                "fofura": fofura, 
+                "velocidade": velocidade, 
+                "tamanho": tamanho, 
+                "idade": idade, 
+                "tipo": tipo, 
+                "imagem": imagem, 
+                "last_modified": last_modified}
     except Exception as e:
         return {"status": 500, "message": "failure to get card", "command": "none"}
+
+def get_card_by_name(name):
+    return simple_command_fetchone('''SELECT * FROM card WHERE card_name = ?''', (name,))
+
+
+def get_card_by_id(id): 
+    return simple_command_fetchone('''SELECT * FROM card WHERE id = ?''', (id,))
 
 def edit_card(_data):
     try:
@@ -313,18 +356,66 @@ def delete_card(_data):
     except Exception as e:
         return {"status": 500, "message": "failure to delete card", "command": "none"}
 
+# Statistics Functions
+def get_statistics_user():
+    return simple_command_fetchone('''SELECT value FROM statistics WHERE key = ?''', ("users",))
+
+def get_statistics_cards():
+    return simple_command_fetchone('''SELECT value FROM statistics WHERE key = ?''', ("cards",))
+
+def get_statistics_decks():
+    return simple_command_fetchone('''SELECT value FROM statistics WHERE key = ?''', ("decks",))
+
+def get_statistics_matches():
+    return simple_command_fetchone('''SELECT value FROM statistics WHERE key = ?''', ("matches",))
+
+def get_statistics_banned():
+    return simple_command_fetchone('''SELECT value FROM statistics WHERE key = ?''', ("bans",))
+
+def increment_statistics_users():
+    execute_simple_command('''UPDATE statistics SET value = value + 1 WHERE key = ?''', ("users",))
+
+def increment_statistics_cards():
+    execute_simple_command('''UPDATE statistics SET value = value + 1 WHERE key = ?''', ("cards",))
+    
+def increment_statistics_decks():
+    execute_simple_command('''UPDATE statistics SET value = value + 1 WHERE key = ?''', ("decks",))
+    
+def increment_statistics_matches():
+    execute_simple_command('''UPDATE statistics SET value = value + 1 WHERE key = ?''', ("matches",))
+    
+def increment_statistics_bans():
+    execute_simple_command('''UPDATE statistics SET value = value + 1 WHERE key = ?''', ("bans",))
+    
+def decrement_statistics_users():
+    execute_simple_command('''UPDATE statistics SET value = value - 1 WHERE key = ?''', ("users",))
+
+def decrement_statistics_cards():
+    execute_simple_command('''UPDATE statistics SET value = value - 1 WHERE key = ?''', ("cards",))
+
+def decrement_statistics_decks():
+    execute_simple_command('''UPDATE statistics SET value = value - 1 WHERE key = ?''', ("decks",))
+
+
+
 # Auxiliary Functions
+def execute_simple_command(command, params):
+    conn, c = get_db_connection()
+    c.execute(command, params)
+    conn.commit()
+    conn.close()
+
+def simple_command_fetchone(command, params):
+    conn, c = get_db_connection()
+    result = c.execute(command, params).fetchone()
+    conn.close()
+    return result
+
 def get_9_random_cards():
     conn, c = get_db_connection()
     cards = c.execute('''SELECT * FROM cards ORDER BY RANDOM() LIMIT 9''').fetchall()
     conn.close()
     return cards
-
-def get_card_by_id(id):
-    conn, c = get_db_connection()
-    card = c.execute('''SELECT * FROM cards WHERE id = ?''', (id,)).fetchone()
-    conn.close()
-    return card
 
 def get_user_cards(user_id):
     conn, c = get_db_connection()
@@ -350,6 +441,11 @@ def get_deck_by_id(deck_id):
     conn.close()
     return deck
 
+def get_all_usernames():
+    conn, c = get_db_connection()
+    usernames = c.execute('''SELECT username FROM users''').fetchall()
+    conn.close()
+    return usernames
 
 # Card File Functions
 def save_image_to_file(image_base64, card_name):

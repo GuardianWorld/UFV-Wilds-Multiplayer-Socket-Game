@@ -9,9 +9,7 @@ import datetime
 import signal
 
 import database
-from config import active_connections, stop_event, logged_users, searching_for_match, match_rooms
-
-log_event_level = 5
+from config import active_connections, stop_event, logged_users, searching_for_match, match_rooms, log_event_level
 
 #Signal Handling
 def signal_handler(sig, frame):
@@ -63,48 +61,38 @@ def shutdown_server(timeout=5):
 
 #Internal Server Side
 def internal_server_terminal():
+    global log_event_level
     log_event_level = 5
     print("[*] Server terminal started.")
-    try:
-        while not stop_event.is_set():
-            command = input("")
+    while not stop_event.is_set():
+        try:
+            command = input(" >> ")
             if command == "shutdown":
                 print("[*] Shutdown command issued, stopping...")
                 stop_event.set()
             elif command == "status":
-                number_of_sockets = len(active_connections)
-                print("[*] Server is running.")
-                print(f"[*] Number of sockets open: {number_of_sockets}")
-                print(f"[*] Number of users online: {len(logged_users)}")
-                print(f"[*] Number of match rooms: {len(match_rooms)}")
-                print(f"[*] Searching for match: {len(searching_for_match)}")
+                terminal_status()
+            elif command == "statistics":
+                terminal_stats()
             elif command == "connections":
-                print(f"[*] Active connections: ")
-                for connection, socket_time_pair in active_connections.items():
-                    print(f" >> {connection[0]}:{connection[1]} - {socket_time_pair[1]}")
+                terminal_comms()
             elif command == "users":
-                number_of_users = len(logged_users)
-                print("[*] Number of Users Online: ", number_of_users)
-                for connection, user in logged_users.items():
-                    print(f" >> {connection[0]}:{connection[1]} [{user}]")
+                terminal_users()
             elif command == "matches":
-                print(f"[*] Number of match rooms: {len(match_rooms)}")
-                for room, players in match_rooms.items():
-                    print(f" >> Room {room}: {players}")
+                terminal_matches()
             elif command == "searching":
-                print(f"[*] Searching for match: {len(searching_for_match)}")
-                for player, player_socket in searching_for_match.items():
-                    print(f" >> {player}")
+                terminal_searching()
             elif command == "database search":
-                search()
+                terminal_search()
             elif command == "config":
-                config()     
+                terminal_config()     
             elif command == "ban":
-                user_ban()      
+                terminal_user_ban()      
             elif command == "help":
                 print("[*] Available commands: ")
                 print(" >> shutdown - Stops the server.")
                 print(" >> status - Shows server status.")
+                print(" >> statistics - Shows server statistics.")
                 print(" >> connections - Shows active connections.")
                 print(" >> users - Shows online users.")
                 print(" >> matches - Shows current matches.")
@@ -115,79 +103,163 @@ def internal_server_terminal():
                 print(" >> help - Shows this message.")
             else:
                 print("[*] Invalid command. Type 'help' for available commands.")
-    except KeyboardInterrupt:
-        print("\n[*] Keyboard interruption.")
-    except Exception as e:
-        print(f"Error: {e}")
+        except KeyboardInterrupt:
+            print("\n[*] Keyboard interruption.")
+        except Exception as e:
+            print(f"Error: {e}")
 
     print("[*] Server terminal stopped.")
 
-def config():
+def terminal_config():
+    global log_event_level
     print("[*] Configuring server.")
-
+    command = ""
+    
     while(command != "exit"):
         print("[*] Available commands: ")
         print(f" >> log level - Sets the log level. Current: {log_event_level}")
         print(" >> add card - Adds a card to the database.")
         print(" >> add test cards - Adds test cards to the database.")
         print(" >> exit - Exits configuration.")
-        command = input("config command: ")
+        command = input("[config] >> ")
         if(command == "log level"):
-            print("    >> 0 - No logs.")
-            print("    >> 1 - Player Logins")
-            print("    >> 2 - Player Logins + Register")
-            print("    >> 3 - Player Logins + Register + Matches")
-            print("    >> 4 - Player Logins + Register + Matches + Connections")
-            print("    >> 5 - Player Logins + Register + Matches + Connections + Debug")
-            log_event_level = int(input("Log Level: "))
+            print("    > 0 - No logs.")
+            print("    > 1 - Player Logins")
+            print("    > 2 - Player Logins + Register")
+            print("    > 3 - Player Logins + Register + Matches")
+            print("    > 4 - Player Logins + Register + Matches + Connections")
+            print("    > 5 - Player Logins + Register + Matches + Connections + Debug")
+            try:
+                log_event_level = int(input("Log Level: "))
+            except:
+                print("[config] Invalid log level.")
         elif(command == "add card"):
             add_cards()
         elif(command == "add test cards"):
-            input = int(input("Quantas cartas deseja adicionar?"))
-            for i in range(input):
+            value = int(input("[config] > Number of test cards: "))
+            for i in range(value):
                 add_test_cards()
-    
-def search():
+
+def terminal_status():
+    number_of_sockets = len(active_connections)
+    print("[*] Server is running.")
+    print(f"[*] Number of sockets open: {number_of_sockets}")
+    print(f"[*] Number of users online: {len(logged_users)}")
+    print(f"[*] Number of match rooms: {len(match_rooms)}")
+    print(f"[*] Searching for match: {len(searching_for_match)}")
+
+def terminal_stats():
+    print(f"[*] Number of Users: {database.get_statistics_user()[0]}")
+    print(f"[*] Number of Cards: {database.get_statistics_cards()[0]}")
+    print(f"[*] Number of Decks: {database.get_statistics_decks()[0]}")
+    print(f"[*] Number of Matches: {database.get_statistics_matches()[0]}")
+    print(f"[*] Number of Banned Users: {database.get_statistics_banned()[0]}")   
+
+def terminal_comms():
+    print(f"[*] Active connections: ")
+    for connection, socket_time_pair in active_connections.items():
+        print(f" -> {connection[0]}:{connection[1]} - {socket_time_pair[1]}")
+
+def terminal_users():
+    number_of_logged_users = len(logged_users)
+    number_of_users = database.get_statistics_user()[0]
+    print("[*] Number of Users: ", number_of_users)
+    print("[*] Number of Users Online: ", number_of_logged_users)
+    print("[*] Show online users? [y/n]: ")
+    value = input("[users] >> ")
+    if(value == "y"):
+        print("[*] Online users:")
+        for connection, user in logged_users.items():
+            print(f" -> {connection[0]}:{connection[1]} [{user}]")
+        if(number_of_logged_users == 0):
+            print(" -> No users online.")
+    print("[*] Show all users? [y/n]: ")
+    value = input("[users] >> ")
+    if(value == "y"):
+        print("[*] All users:")
+        users = database.get_all_usernames()
+        x = 0
+        for user in users:
+            x += 1
+            print(f" {x} -> {user[0]}")
+
+def terminal_matches():
+    print(f"[*] Number of match rooms: {len(match_rooms)}")
+    for room, players in match_rooms.items():
+        print(f" -> Room {room}: {players}")
+
+def terminal_searching():
+    print(f"[*] Searching for match: {len(searching_for_match)}")
+    for player, player_socket in searching_for_match.items():
+        print(f" -> {player}")
+
+def terminal_search():
     print("[*] Available search commands: ")
+    command = ""
     
     while(command != "exit"):
-        print(" >> card - Search for cards.")
-        print(" >> user - Search for users.")
-        print(" >> exit - Exit search.")
-        command = input("Search command: ")
+        print(" > card - Search for cards.")
+        print(" > user - Search for users.")
+        print(" > exit - Exit search.")
+        command = input("[search] >> ")
         if(command == "card"):
             search_card()
         elif(command == "user"):
             search_user()
+        elif(command == "all_cards"):
+            all_cards()
+        elif(command == "all_users"):
+            all_users()
     
 def search_card():
     print("[*] Search for cards by name.")
-    card_name = input("Card Name: ")
+    card_name = input("[search card] >> ")
     card = database.get_card(card_name)
     if(card):
         print(f"Card: {card}")
     else:
         print("Card not found.")    
+
         
+def all_cards():
+    print("[*] All cards.")
+    cards = database.get_all_cards()
+    for card in cards:
+        print(f" >> {card}")
+
 def search_user():
-    print("[*] Search for player information.")
-    username = input("Username: ")
+    print("[*] Search for player information by username.")
+    username = input("[search user] >> ")
     user = database.get_user(username)
+    
     if(user):
-        for key, value in user.items():
-            print(f">> {key}: {value}")
+        print(f"ID: {user[0]}")
+        print(f"Username: {user[1]}")
+        print(f"Matches Played: {user[2]}")
+        print(f"Matches Won: {user[3]}")
+        if(user[4] == 1):
+            print(f"Banned status: Banned")
+        else:
+            print(f"Banned status: Not Banned")
     else:
         print("User not found.")
-    
-def user_ban():
-    print("[*] Ban/Unban a user.")
-    username = input("Username: ")
+
+def all_users():
+    print("[*] All users.")
+    users = database.get_all_users()
+    for user in users:
+        print(f" >> {user}")
+
+def terminal_user_ban():
+    print("[*] Ban/Unban a user via Username.")
+    username = input("[ban] >> ")
     user = database.get_user(username)
     is_banned = database.is_banned(username)
     if(user):
         if(is_banned):
             print(f"User {username} is banned.")
             print(f"Unban user {username}? [y/n]")
+            print("[ban] >> ")
             confirm = input()
             if(confirm == "y"):
                 database.unban_user(username)
@@ -196,7 +268,7 @@ def user_ban():
         else:
             print(f"User {username} is not banned.")
             print(f"Ban user {username}? [y/n]")
-            confirm = input()
+            confirm = input("[ban] >> ")
             if(confirm == "y"):
                 database.ban_user(username)
                 print(f"User {username} banned.")
@@ -208,7 +280,8 @@ def user_ban():
 
 #Server-Client Side
 
-def handle_client(client_socket, client_address):        
+def handle_client(client_socket, client_address):     
+    global log_event_level   
     if(log_event_level >= 4):
         print(f"[*] Accepted connection from: {client_address[0]}:{client_address[1]}")
     active_connections[client_address] = (client_socket, datetime.datetime.utcnow())
@@ -221,7 +294,6 @@ def handle_client(client_socket, client_address):
         while not stop_event.is_set():
             try:
                 request = client_socket.recv(4096)
-                #print(request)
                 if not request:
                     break
                 data = json.loads(request.decode())
@@ -240,7 +312,7 @@ def handle_client(client_socket, client_address):
             print(f"[*] Connection closed from: {client_address[0]}:{client_address[1]}")
 
 def handle_response(data, client_address):
-
+    global log_event_level
     message = data.get('message')
     command = data.get('command')
     token = data.get('token')
@@ -301,6 +373,9 @@ def add_cards():
     
     print("[*] Adicionando carta ao banco de dados.")
     card_name = input(">> Nome da Carta: ")
+    if(database.get_card_by_name(card_name)):
+        print("Error: Card Already Exists")
+        return
     card_group = input(">> Grupo da Carta: ")
     forca = input(">> Força [0-10]: ")
     fofura = input(">> Fofura [0-10]: ")
@@ -313,25 +388,22 @@ def add_cards():
     
     #verify cards attributes as valid
     if(forca < 0 or forca > 10):
-        print("Força invalida")
+        print("Error: Força")
         return
     if(fofura < 0 or fofura > 10):
-        print("Fofura invalida")
+        print("Error: Fofura")
         return
     if(velocidade < 0 or velocidade > 10):
-        print("Velocidade invalida")
+        print("Error: Velocidade")
         return
     if(tamanho < 1 or tamanho > 5):
-        print("Tamanho invalido")
+        print("Error: Tamanho")
         return
     if(idade < 1 or idade > 4):
-        print("Idade invalida")
+        print("Error: Idade")
         return
     if(tipo < 1 or tipo > 3):
-        print("Tipo invalido")
-        return
-    if(database.get_card(card_name)):
-        print("Carta ja existe.")
+        print("Error: Tipo")
         return
     
     #Confirm card
@@ -345,10 +417,10 @@ def add_cards():
     print("Tipo: ", Tipo_dict[tipo])
     print("Imagem: ", path)
     
-    print("Adicionar carta? [y/n]")
+    print("Add card? [y/n]")
     confirm = input()
-    if(confirm != "n"):
-        print("Carta nao adicionada.")
+    if(confirm == "n"):
+        print("Card not added.")
         return
     
     database.add_card(card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, path)
@@ -370,13 +442,22 @@ def add_test_cards():
         card_group = "Test Group"
         card_image = "Placeholder"
         path = "/StreamingAssets/" + card_image + ".png"
-        if(database.get_card(card_name)):
-            print("Carta ja existe.")
+        if(database.get_card_by_name(card_name)):
+            print(f"[*] Card Already Exists {card_name}")
             continue
         else:
+            print(f"[*] Adding Card: {card_name}")
+            print(f"[*] Força: {forca}")
+            print(f"[*] Fofura: {fofura}")
+            print(f"[*] Velocidade: {velocidade}")
+            print(f"[*] Tamanho: {tamanho_dict[tamanho]}")
+            print(f"[*] Idade: {idade_dict[idade]}")
+            print(f"[*] Tipo: {Tipo_dict[tipo]}")
+            print(f"[*] Grupo: {card_group}")
+            print(f"[*] Imagem: {path}\n")
+            database.add_card(card_name, card_group, forca, fofura, velocidade, tamanho_dict[tamanho], idade_dict[idade], Tipo_dict[tipo], path)
             break
         
-    database.add_card(card_name, card_group, forca, fofura, velocidade, tamanho_dict[tamanho], idade_dict[idade], Tipo_dict[tipo], path)
     
 
 if __name__ == "__main__":
