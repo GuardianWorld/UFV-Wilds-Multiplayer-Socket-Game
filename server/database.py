@@ -19,7 +19,8 @@ def init_db():
               password TEXT, 
               admin INTEGER,
               matches INTEGER,
-              matches_won INTEGER)''')
+              matches_won INTEGER
+              banned INTEGER)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS card (
               id INTEGER PRIMARY KEY, 
@@ -59,6 +60,16 @@ def init_db():
                 key TEXT, 
                 value INTEGER)''')
     
+    # Verify if there is any ID in the statistics
+    if not c.execute('''SELECT * FROM statistics''').fetchone():
+        c.execute('''INSERT INTO statistics (key, value) VALUES (?, ?)''', ("users", 0))
+        c.execute('''INSERT INTO statistics (key, value) VALUES (?, ?)''', ("cards", 0))
+        c.execute('''INSERT INTO statistics (key, value) VALUES (?, ?)''', ("decks", 0))
+        c.execute('''INSERT INTO statistics (key, value) VALUES (?, ?)''', ("matches", 0))
+        c.execute('''INSERT INTO statistics (key, value) VALUES (?, ?)''', ("bans", 0))
+    
+    # Update user with BANNED
+    c.execute('''ALTER TABLE users ADD COLUMN banned INTEGER''')
 
     conn.commit()
     conn.close()
@@ -106,12 +117,45 @@ def get_user_id(username):
     conn.close()
     return ID
 
+def get_user(username):
+    conn, c = get_db_connection()
+    user = c.execute('''SELECT * FROM users WHERE username = ?''', (username,)).fetchone()
+    conn.close()
+    return user
+
+def is_user_banned(username):
+    conn, c = get_db_connection()
+    banned = c.execute('''SELECT banned FROM users WHERE username = ?''', (username,)).fetchone()
+    conn.close()
+    if(banned == 1):
+        return True
+    return False
+
+def ban_user(username):
+    try:
+        conn, c = get_db_connection()
+        c.execute('''UPDATE users SET banned = 1 WHERE username = ?''', (username,))
+        conn.commit()
+        conn.close()
+        return {"status": 200, "message": "Success", "command": "ban"}
+    except Exception as e:
+        return {"status": 500, "message": str(e), "command": "error"}
+
+def unban_user(username):
+    try:
+        conn, c = get_db_connection()
+        c.execute('''UPDATE users SET banned = 0 WHERE username = ?''', (username,))
+        conn.commit()
+        conn.close()
+        return {"status": 200, "message": "Success", "command": "unban"}
+    except Exception as e:
+        return {"status": 500, "message": str(e), "command": "error"}
 
 def add_user(username, password):
     try:
         conn, c = get_db_connection()
         hashed_password = hash_password(password)
-        c.execute('''INSERT INTO users (username, password, admin, matches, matches_won) VALUES (?, ?, ?, ?, ?)''', (username, hashed_password, 0, 0, 0))
+        c.execute('''INSERT INTO users (username, password, admin, matches, matches_won, banned) VALUES (?, ?, ?, ?, ?, ?)''', (username, hashed_password, 0, 0, 0, 0))
         conn.commit()
         conn.close()
         return {"status": 200, "message": "Success", "command": "register"}
@@ -125,6 +169,11 @@ def login_user(username, password):
 
         conn, c = get_db_connection()
         user_id = c.execute('''SELECT id FROM users WHERE username = ? AND password = ?''', (username, hashed_password)).fetchone()
+        
+        if(is_user_banned(username)):
+            return {"status": 401, "message": "User is banned", "command": "error"}
+            
+            
         conn.close()
         if user_id:
             token = generate_token(user_id[0])
