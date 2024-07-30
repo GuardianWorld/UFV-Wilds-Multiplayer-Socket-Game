@@ -43,7 +43,8 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS decks (
               id INTEGER PRIMARY KEY, 
               deck_name TEXT,
-              user_id INTEGER)''')
+              user_id INTEGER,
+              active INTEGER)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS deck_cards (
               id INTEGER PRIMARY KEY, 
