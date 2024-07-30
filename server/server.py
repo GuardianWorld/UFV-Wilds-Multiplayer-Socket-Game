@@ -358,6 +358,12 @@ def handle_response(data, client_address, client_socket):
         if(log_event_level >= 1):
             print(f"[*] Receiving login from user: {data.get('username')}")
         response = login(data.get('username'), data.get('password'), client_address)
+    elif(command == "check_decks"):
+        response = check_decks(logged_users.get(client_address))
+    elif(command == "activate_deck"):
+        user_id = database.get_user_id(logged_users.get(client_address))[0]
+        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)[0]
+        response = database.activate_deck(token, deck_id)
     elif(command == "match_search"):
         username = logged_users.get(client_address)
         if(username == None):
@@ -371,6 +377,22 @@ def handle_response(data, client_address, client_socket):
     return response
     
     
+def check_decks(username):
+    print("check decks")
+    user_id = database.get_user_id(username)[0]
+    print(user_id)
+    if(user_id == None):
+        return {"status": 500, "message": "User not found", "command": "error"}
+    
+    decks = database.get_user_decks(user_id)
+    print(decks)
+    if(decks == None):
+        return {"status": 500, "message": "No decks found", "command": "error"}
+    
+    #unpack tuple into a list to be able to serialize
+
+    
+    return {"status": 200, "message": "decks found:", "command": "check_decks", "decks": decks}
 
 def check_online_user(username):
     for connection, user in logged_users.items():
@@ -391,10 +413,13 @@ def register(username, password, client_address):
         for card in cards_9:
             database.add_card_to_user(card[0], result['id'])
         
-        # Add a new deck with the cards.
-        #database.add_deck(result['id'], cards_9)
+        # Add a default deck
+        database.add_deck(result['id'], "Default", 1)
+        deck_id = database.get_deck_id(result['id'], "Default")
+        database.make_deck_active(result['id'], deck_id)
         
         return result
+
 
 def login(username, password, client_address):
     if(check_online_user(username)):
@@ -404,6 +429,46 @@ def login(username, password, client_address):
         logged_users[client_address] = username
     
     return response
+
+def make_deck(username, deck_name):
+    user_id = database.get_user_id(username)
+    if(user_id == None):
+        return {"status": 500, "message": "User not found", "command": "error"}
+    return database.add_deck(user_id, deck_name)
+    
+def add_card_to_deck(username, deck_name, card_name):
+    user_id = database.get_user_id(username)
+    if(user_id == None):
+        return {"status": 500, "message": "User not found", "command": "error"}
+    
+    deck_id = database.get_deck_id(user_id, deck_name)
+    if(deck_id == None):
+        return {"status": 500, "message": "Deck not found", "command": "error"}
+    
+    card_id = database.get_card_id(card_name)
+    if(card_id == None):
+        return {"status": 500, "message": "Card not found", "command": "error"}
+    
+    #check if deck has less than 9 cards
+    if(database.get_deck_size(deck_id) >= 9):
+        return {"status": 500, "message": "Deck is full", "command": "error"}
+    
+    return database.add_card_to_deck(deck_id, card_id)
+
+def remove_card_from_deck(username, deck_name, card_name):
+    user_id = database.get_user_id(username)
+    if(user_id == None):
+        return {"status": 500, "message": "User not found", "command": "error"}
+    
+    deck_id = database.get_deck_id(user_id, deck_name)
+    if(deck_id == None):
+        return {"status": 500, "message": "Deck not found", "command": "error"}
+    
+    card_id = database.get_card_id(card_name)
+    if(card_id == None):
+        return {"status": 500, "message": "Card not found", "command": "error"}
+    
+    return database.remove_card_from_deck(deck_id, card_id)
 
 # Server-side commands
 def add_cards():

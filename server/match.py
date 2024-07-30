@@ -48,6 +48,8 @@ def play_field(matched_players):
     player3_name = matched_players[2][0]
     player3_socket = matched_players[2][1]
     
+    player1_deck = database.get_active_deck(player1_name)
+    
     if(log_event_level >= 5):
         print(f"[*] Match started between {player1_name}, {player2_name} and {player3_name}")
     

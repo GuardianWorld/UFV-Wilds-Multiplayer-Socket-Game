@@ -44,7 +44,8 @@ def init_db():
               id INTEGER PRIMARY KEY, 
               deck_name TEXT,
               user_id INTEGER,
-              active INTEGER)''')
+              active INTEGER,
+              default_deck INTEGER)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS deck_cards (
               id INTEGER PRIMARY KEY, 
@@ -208,7 +209,7 @@ def login_user(username, password):
         return {"status": 500, "message": str(e), "command": "error"}
 
 
-# Card Functions
+# Card Functions (Terminal ONLY)
 def add_card(card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, imagem):
     try:
         conn, c = get_db_connection()
@@ -234,6 +235,21 @@ def add_card(card_name, card_group, forca, fofura, velocidade, tamanho, idade, t
     except Exception as e:
         return {"status": 500, "message": "failure to add card", "command": "none"}
 
+def delete_card(card_name):
+    try:        
+        conn, c = get_db_connection()
+        card_id = get_card_by_name(card_name)[0]
+
+        c.execute('''DELETE FROM cards WHERE id = ?''', (card_id,))
+        c.execute('''DELETE FROM user_cards WHERE card_id = ?''', (card_id,))
+        c.execute('''DELETE FROM deck_cards WHERE card_id = ?''', (card_id,))
+
+        conn.commit()
+        conn.close()
+        return {"status": 200, "message": "Success", "command": "delete_card"}
+    except Exception as e:
+        return {"status": 500, "message": "failure to delete card", "command": "none"}
+
 def get_card_details(_data):
     try:
         data = json.loads(_data)
@@ -243,6 +259,8 @@ def get_card_details(_data):
         
         card_name = data.get('card_name')
         card = get_card_by_name(card_name)
+        #card_id = card[0]
+        #card_name = card[1]
         card_group = card[2]
         forca = card[3]
         fofura = card[4]
@@ -269,107 +287,13 @@ def get_card_details(_data):
                 "imagem": imagem, 
                 "last_modified": last_modified}
     except Exception as e:
-        return {"status": 500, "message": "failure to get card", "command": "none"}
+        return {"status": 500, "message": "failure to get card", "command": "error"}
 
 def get_card_by_name(name):
     return simple_command_fetchone('''SELECT * FROM card WHERE card_name = ?''', (name,))
 
-
 def get_card_by_id(id): 
     return simple_command_fetchone('''SELECT * FROM card WHERE id = ?''', (id,))
-
-def edit_card(_data):
-    try:
-        data = json.loads(_data)
-        user_id, status = validate_token(data.get('token'))
-        if status.get('status') != 200:
-            return status
-        conn, c = get_db_connection()
-
-        is_admin = c.execute('''SELECT admin FROM users WHERE id = ?''', (user_id,)).fetchone()
-        if is_admin != 1:
-            conn.close()
-            return {"status": 401, "message": "User is not an admin"}
-        
-        card_id = data.get('card_id')
-
-        old_values = get_card_by_id(card_id)
-
-        card_name = data.get('card_name')
-        card_group = data.get('card_group')
-        forca = data.get('forca')
-        fofura = data.get('fofura')
-        velocidade = data.get('velocidade')
-        tamanho = data.get('tamanho')
-        idade = data.get('idade')
-        tipo = data.get('tipo')
-        imagem = data.get('imagem')
-        last_modified = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        if(card_name == ""):
-            card_name = old_values[1]
-        if(card_group == ""):
-            card_group = old_values[2]
-        if(forca == ""):
-            forca = old_values[3]
-        if(fofura == ""):
-            fofura = old_values[4]
-        if(velocidade == ""):
-            velocidade = old_values[5]
-        if(tamanho == ""):
-            tamanho = old_values[6]
-        if(idade == ""):
-            idade = old_values[7]
-        if(tipo == ""):
-            tipo = old_values[8]
-        if(imagem == ""):
-            image_path = old_values[9]
-        else:
-            image_path = save_image_to_file(imagem, card_name)
-
-        c.execute('''UPDATE cards SET
-                   card_name = ?,
-                   card_group = ?,
-                   forca = ?,
-                   fofura = ?,
-                   velocidade = ?,
-                   tamanho = ?,
-                   idade = ?,
-                   tipo = ?,
-                   imagem = ?,
-                   last_modified = ?
-                   WHERE id = ?''', (card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, image_path, last_modified, card_id))
-
-        conn.commit()
-        conn.close()
-        return {"status": 200, "message": "Success", "command": "none"}
-    except Exception as e:
-        return {"status": 500, "message": "failure to edit card", "command": "none"}
-
-def delete_card(_data):
-    try:
-        data = json.loads(_data)
-        user_id, status = validate_token(data.get('token'))
-        if status.get('status') != 200:
-            return status
-        conn, c = get_db_connection()
-
-        is_admin = c.execute('''SELECT admin FROM users WHERE id = ?''', (user_id,)).fetchone()
-        if is_admin != 1:
-            conn.close()
-            return {"status": 401, "message": "User is not an admin"}
-        
-        card_id = data.get('card_id')
-
-        c.execute('''DELETE FROM cards WHERE id = ?''', (card_id,))
-        c.execute('''DELETE FROM user_cards WHERE card_id = ?''', (card_id,))
-        c.execute('''DELETE FROM deck_cards WHERE card_id = ?''', (card_id,))
-
-        conn.commit()
-        conn.close()
-        return {"status": 200, "message": "Success", "command": "none"}
-    except Exception as e:
-        return {"status": 500, "message": "failure to delete card", "command": "none"}
 
 def add_card_to_user(user_id, card_id):
     try:
@@ -388,6 +312,85 @@ def check_user_has_card(user_id, card_id):
     if card:
         return True
     return False
+
+# Deck functions
+def add_deck(user_id, deck_name, default_deck=0):
+    try:
+        conn, c = get_db_connection()
+        c.execute('''INSERT INTO decks (deck_name, user_id, active, default_deck) VALUES (?, ?, ?, ?)''', (deck_name, user_id, 0, default_deck))
+        conn.commit()
+        conn.close()
+        increment_statistics_decks()
+        return {"status": 200, "message": "Success", "command": "add_deck"}
+    except Exception as e:
+        return {"status": 500, "message": "failure to add deck", "command": "none"}
+
+
+def make_deck_active(user_id, deck_id):
+    try:
+        conn, c = get_db_connection()
+        print(user_id, deck_id)
+        c.execute('''UPDATE decks SET active = 1 WHERE user_id = ? AND id = ?''', (user_id, deck_id))
+        c.execute('''UPDATE decks SET active = 0 WHERE user_id = ? AND id != ?''', (user_id, deck_id))
+        conn.commit()
+        conn.close()
+        return {"status": 200, "message": "Success", "command": "activate_deck"}
+    except Exception as e:
+        return {"status": 500, "message": "failure to make deck active", "command": "none"}
+
+def get_active_deck(user_id):
+    conn, c = get_db_connection()
+    deck = c.execute('''SELECT * FROM decks WHERE user_id = ? AND active = 1''', (user_id,)).fetchone()
+    conn.close()
+    return deck
+
+def add_card_to_deck(deck_id, card_id):
+    try:
+        conn, c = get_db_connection()
+        c.execute('''INSERT INTO deck_cards (deck_id, card_id) VALUES (?, ?)''', (deck_id, card_id))
+        conn.commit()
+        conn.close()
+        return {"status": 200, "message": "Success", "command": "none"}
+    except Exception as e:
+        return {"status": 500, "message": "failure to add card to deck", "command": "none"}
+
+def remove_card_from_deck(deck_id, card_id):
+    try:
+        conn, c = get_db_connection()
+        c.execute('''DELETE FROM deck_cards WHERE deck_id = ? AND card_id = ?''', (deck_id, card_id))
+        conn.commit()
+        conn.close()
+        return {"status": 200, "message": "Success", "command": "none"}
+    except Exception as e:
+        return {"status": 500, "message": "failure to remove card from deck", "command": "none"}
+
+def get_card_amount_in_deck(deck_id):
+    conn, c = get_db_connection()
+    cards = c.execute('''SELECT * FROM deck_cards WHERE deck_id = ?''', (deck_id,)).fetchall()
+    conn.close()
+    return len(cards)
+
+def get_deck_by_id(deck_id):
+    conn, c = get_db_connection()
+    deck = c.execute('''SELECT * FROM decks WHERE id = ?''', (deck_id,)).fetchone()
+    conn.close()
+    return deck
+
+def get_deck_id_by_name(deck_name, user_id):
+    conn, c = get_db_connection()
+    deck = c.execute('''SELECT id FROM decks WHERE deck_name = ? AND user_id = ?''', (deck_name, user_id)).fetchone()
+    conn.close()
+    return deck
+
+def activate_deck(token, deck_id):
+    try:
+        user_id, status = validate_token(token)
+        if status.get('status') != 200:
+            return status
+        return make_deck_active(user_id, deck_id)
+    except Exception as e:
+        return {"status": 500, "message": "failure to activate deck", "command": "none"}
+    
 
 # Statistics Functions
 def get_statistics_user():
@@ -467,12 +470,6 @@ def get_user_decks(user_id):
     decks = c.execute('''SELECT * FROM decks WHERE user_id = ?''', (user_id,)).fetchall()
     conn.close()
     return decks
-
-def get_deck_by_id(deck_id):
-    conn, c = get_db_connection()
-    deck = c.execute('''SELECT * FROM decks WHERE id = ?''', (deck_id,)).fetchone()
-    conn.close()
-    return deck
 
 def get_all_usernames():
     conn, c = get_db_connection()

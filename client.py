@@ -26,13 +26,18 @@ def package_message(message, token="none"):
 
     try:
         if(command == "exit"):
-            json_message = {"token": token, "message": message, "command": "logoff"}
+            json_message = {"token": token, "message": "", "command": "logoff"}
         elif(command == "register"):
             send_status, json_message = register(message, token)
         elif(command == "login"):
             send_status, json_message = login(message, token)
         elif(command == "match_search"):
-            send_status, json_message = match_search(token)                    
+            send_status, json_message = match_search(token)           
+        elif(command == "activate_deck"):
+            deck_name = full_message[1]
+            json_message = {"token": token, "message": "", "command": "activate_deck", "deck_name": deck_name}
+        elif(command == "check_decks"):
+            json_message = {"token": token, "message": "", "command": "check_decks"}         
         else:
             json_message = {"token": token, "message": message, "command": "chat"}
     except Exception as e:
@@ -70,6 +75,24 @@ def receive_message(client_socket):
                 sleep(0.2)
                 stop_event.set()
                 return
+            elif(command == "check_decks"):
+                decks = response_json.get('decks')
+                for deck in decks:
+                    # grab out the ID, Name, User ID, Active and default
+                    deck_id, deck_name, user_id, active, default = deck
+                    if(active == 1):
+                        active = "Yes"
+                    else:
+                        active = "No"
+                    if(default == 1):
+                        default = "Yes"
+                    else:
+                        default = "No"
+                    print(f"[*] Deck Name: {deck_name}, Active: {active}, Default: {default}")
+                print(f"[*] Decks: {decks}")
+            elif(command == "activate_deck"):
+                deck_name = response_json.get('deck_name')
+                print(f"[*] Deck {deck_name} activated")
             elif(command == "match_start"):
                 player_1 = response_json.get('player_1')
                 player_2 = response_json.get('player_2')
@@ -93,7 +116,7 @@ def receive_message(client_socket):
             stop_event.set()
             return
         
-        
+
 
 def client_handler(client_socket):
     global stop_event
