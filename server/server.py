@@ -8,8 +8,10 @@ import time
 import datetime
 import signal
 
+
 import database
 from config import active_connections, stop_event, logged_users, searching_for_match, match_rooms, log_event_level
+import match
 
 #Signal Handling
 def signal_handler(sig, frame):
@@ -38,6 +40,11 @@ def start_server(host, port):
 
     terminal = threading.Thread(target=internal_server_terminal)
     terminal.start()
+    
+    match_thread = threading.Thread(target=match.search_match)
+    match_thread.start()
+    
+    
     while not stop_event.is_set():
         try:
             client_socket, client_address = server_socket.accept()
@@ -47,6 +54,7 @@ def start_server(host, port):
             continue
     
     terminal.join()
+    match_thread.join()
     shutdown_server()
     server_socket.close()
 
@@ -59,7 +67,8 @@ def shutdown_server(timeout=5):
         client_socket.close()
     sys.exit(0)
 
-#Internal Server Side
+# region Internal Server Terminal
+
 def internal_server_terminal():
     global log_event_level
     log_event_level = 5
@@ -219,7 +228,6 @@ def search_card():
         print(f"Card: {card}")
     else:
         print("Card not found.")    
-
         
 def all_cards():
     print("[*] All cards.")
@@ -278,6 +286,8 @@ def terminal_user_ban():
     
     print("Operation canceled.")
 
+#endregion
+
 #Server-Client Side
 
 def handle_client(client_socket, client_address):     
@@ -293,11 +303,18 @@ def handle_client(client_socket, client_address):
     try:
         while not stop_event.is_set():
             try:
+                if(client_address in logged_users):
+                    if(match.player_in_match(logged_users[client_address])):
+                        print(f"[*] Player {logged_users[client_address]} is in match.")
+                        #wait until match is over
+                        while match.player_in_match(logged_users[client_address]):
+                            time.sleep(1)
+                        
                 request = client_socket.recv(4096)
                 if not request:
                     break
                 data = json.loads(request.decode())
-                response = json.dumps(handle_response(data, client_address))
+                response = json.dumps(handle_response(data, client_address, client_socket))
                 client_socket.send(response.encode())
             except socket.timeout:
                 continue
@@ -307,11 +324,16 @@ def handle_client(client_socket, client_address):
         client_socket.close()
         del active_connections[client_address]
         if client_address in logged_users:
+            #grab username
+            username = logged_users[client_address]
+            #delete from searched matches
+            if(match.player_searching(username)):
+                del searching_for_match[username]
             del logged_users[client_address]
         if(log_event_level >= 4):
             print(f"[*] Connection closed from: {client_address[0]}:{client_address[1]}")
 
-def handle_response(data, client_address):
+def handle_response(data, client_address, client_socket):
     global log_event_level
     message = data.get('message')
     command = data.get('command')
@@ -336,10 +358,19 @@ def handle_response(data, client_address):
         if(log_event_level >= 1):
             print(f"[*] Receiving login from user: {data.get('username')}")
         response = login(data.get('username'), data.get('password'), client_address)
+    elif(command == "match_search"):
+        username = logged_users.get(client_address)
+        if(username == None):
+            return {"status": 401, "message": "User not logged in", "command": "none"}
+        if(log_event_level >= 3):
+            print(f"[*] Match request received from: {username}")
+        response = match.waiting_for_match(username, client_socket)
     else:
         response = {"status": 401, "message": "Invalid Command", "command": "none"}
 
     return response
+    
+    
 
 def check_online_user(username):
     for connection, user in logged_users.items():

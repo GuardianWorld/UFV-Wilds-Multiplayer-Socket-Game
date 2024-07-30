@@ -105,6 +105,12 @@ def validate_token(token):
     except jwt.InvalidTokenError:
         return None, {"status": 401, "message": "Invalid token", "command": "none"}
 
+def user_from_token(token):
+    user_id, status = validate_token(token)
+    if status.get('status') != 200:
+        return None
+    return get_user_by_id(user_id)
+
 def generate_token(user_id):
     payload = {
         'user_id': user_id,
@@ -194,7 +200,7 @@ def login_user(username, password):
         conn.close()
         if user_id:
             token = generate_token(user_id[0])
-            return {"status": 200, "message": "Success", "command": "login", "token": token}
+            return {"status": 200, "message": "Success", "command": "login", "token": token, "username": username}
         else:
             return {"status": 401, "message": "Invalid username or password", "command": "error"}
     except Exception as e:
@@ -439,7 +445,7 @@ def simple_command_fetchone(command, params):
 
 def get_9_random_cards():
     conn, c = get_db_connection()
-    cards = c.execute('''SELECT * FROM cards ORDER BY RANDOM() LIMIT 9''').fetchall()
+    cards = c.execute('''SELECT * FROM card ORDER BY RANDOM() LIMIT 9''').fetchall()
     conn.close()
     return cards
 
