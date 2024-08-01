@@ -1,4 +1,5 @@
 from telas import iniciaJanela, TelaLogin, TelaMenuPrincipal
+import queue
 
 jogador1 = {
     "nome": "Jogador1",
@@ -258,7 +259,12 @@ jogador3 = {
                     '2_5_6_minusculo_anciao_voador','2_5_6_minusculo_anciao_voador']
 }
 
-cartas = 0
-janela = iniciaJanela(1200, 800)
-nome, senha = TelaLogin(janela)
-TelaMenuPrincipal(janela, jogador1, jogador2, jogador3)
+def startInterface(message_queue, response_queue):
+    cartas = 0
+    janela = iniciaJanela(1200, 800)
+    nome, senha = TelaLogin(janela)
+    message_queue.put(f"login {nome} {senha}")
+    TelaMenuPrincipal(janela, jogador1, jogador2, jogador3)
+
+if __name__ == "__main__":
+    startInterface()

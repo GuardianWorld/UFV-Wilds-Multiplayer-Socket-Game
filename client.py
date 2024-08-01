@@ -5,6 +5,8 @@ import threading
 import json
 import socket
 import sys
+import queue
+from mainTelas import startInterface
 from time import sleep
 
 stop_event = threading.Event()
@@ -123,18 +125,19 @@ def client_handler(client_socket):
     global token
     global username
     try:
-        debugger_auto(client_socket)
+        #debugger_auto(client_socket)
         
         while not stop_event.is_set():
-            message = input("Enter a message: ")
-            if(message and not stop_event.is_set()):
-                send_status, packed_message = package_message(message, token)
-                if not send_status:
-                    print(f"[*] {packed_message.get('message')}")
-                    continue
-                package = json.dumps(packed_message)
-                client_socket.send(package.encode())
-                sleep(0.25)
+            if not message_queue.empty():
+                message = message_queue.get()
+                if(message and not stop_event.is_set()):
+                    send_status, packed_message = package_message(message, token)
+                    if not send_status:
+                        print(f"[*] {packed_message.get('message')}")
+                        continue
+                    package = json.dumps(packed_message)
+                    client_socket.send(package.encode())
+                    sleep(0.25)
 
     except KeyboardInterrupt:
         print("\n[*] User interruption.")
@@ -144,6 +147,7 @@ def client_handler(client_socket):
         print(f"[*] Sender Exception: {str(e)}")
         return
         
+
 def debugger_auto(client_socket):  
     message = ["login mixxs 123456", "login marcos 123456", "login alan 123456", "match_search"]
 
@@ -155,7 +159,6 @@ def debugger_auto(client_socket):
         sleep(0.25)
             
     
-    
             
         
     
@@ -163,6 +166,11 @@ def debugger_auto(client_socket):
 #Start Client
 def start_client(host, port):
     global stop_event
+    global message_queue
+    global response_queue
+
+    message_queue = queue.Queue()
+    response_queue = queue.Queue()
     
     try:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -177,7 +185,8 @@ def start_client(host, port):
     client_handler_tread.start()
     receive_message_thread = threading.Thread(target=receive_message, args=(client_socket,))
     receive_message_thread.start()
-   
+    client_interface_thread = threading.Thread(target=startInterface, args=(message_queue, response_queue))
+    client_interface_thread.start()
 
     try:
         while not stop_event.is_set():
