@@ -262,9 +262,16 @@ jogador3 = {
 def startInterface(message_queue, response_queue):
     cartas = 0
     janela = iniciaJanela(1200, 800)
-    nome, senha = TelaLogin(janela)
-    message_queue.put(f"login {nome} {senha}")
-    TelaMenuPrincipal(janela, jogador1, jogador2, jogador3)
+    while True:
+        nome, senha = TelaLogin(janela)
+        message_queue.put(f"login {nome} {senha}")
+        resposta = response_queue.get()
+        if(resposta == "Success"):
+            TelaMenuPrincipal(janela, jogador1, jogador2, jogador3)
+        else:
+            # mostrar pop-up ou escrever na tela o erro (provavelmente vai ta na 'resposta')
+            continue
+
 
 if __name__ == "__main__":
     startInterface()

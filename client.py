@@ -71,7 +71,7 @@ def receive_message(client_socket):
             elif(command == "login"):
                 token = response_json.get('token')
                 username = response_json.get('username')
-                print(f"[*] Logged in as {username}")
+                response_queue.put(message) # print(f"[*] Logged in as {username}")
             elif(command == "logoff"):
                 print(f"[*] Turning off")
                 sleep(0.2)
@@ -105,15 +105,15 @@ def receive_message(client_socket):
                 on_match = False
                 print(f"[*] Match ended.")
             elif(command == "error"):
-                print(f"[*] Error: {message}")
+                response_queue.put(message) # print(f"[*] Error: {message}")
             else:
                 print(f"[*] Message: {message}")    
         except KeyboardInterrupt:
-            print("\n[*] User interruption.")
+            response_queue.put("User interruption.") # print("\n[*] User interruption.")
             stop_event.set()
             exit(0)
         except Exception as e:
-            print(f"[*] Receive Exception: {str(e)}")
+            response_queue.put(f"[*] Receive Exception: {str(e)}") # print(f"[*] Receive Exception: {str(e)}")
             sleep(4)
             stop_event.set()
             return
@@ -133,18 +133,18 @@ def client_handler(client_socket):
                 if(message and not stop_event.is_set()):
                     send_status, packed_message = package_message(message, token)
                     if not send_status:
-                        print(f"[*] {packed_message.get('message')}")
+                        response_queue.put(packed_message.get('message')) # print(f"[*] {packed_message.get('message')}")
                         continue
                     package = json.dumps(packed_message)
                     client_socket.send(package.encode())
                     sleep(0.25)
 
     except KeyboardInterrupt:
-        print("\n[*] User interruption.")
+        response_queue.put("\n[*] User interruption.") # print("\n[*] User interruption.")
         stop_event.set()
         exit(0)
     except Exception as e:
-        print(f"[*] Sender Exception: {str(e)}")
+        response_queue.put(f"[*] Sender Exception: {str(e)}") # print(f"[*] Sender Exception: {str(e)}")
         return
         
 
