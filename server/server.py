@@ -438,9 +438,13 @@ def handle_response(data, client_address, client_socket):
         card_list = []
         for card_v in cards_from_user_cards:
             #Get the card Name
-            card = database.get_card_by_id(card_v[0])
+            card_id = card_v[2]
+            
+            card = database.get_card_by_id(card_id)
+            card_amount = database.get_card_amount(token, card_id)
             card_name = card[1]
-            card_list.append(card_name)
+            
+            card_list.append((card_name, card_amount))
             
         response = {"status": 200, "message": "cards found:", "command": "check_cards", "cards": card_list}
     

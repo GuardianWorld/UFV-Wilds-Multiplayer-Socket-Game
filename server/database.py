@@ -38,7 +38,8 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS user_cards (
               id INTEGER PRIMARY KEY, 
               user_id INTEGER, 
-              card_id INTEGER)''')
+              card_id INTEGER,
+              amount INTEGER)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS decks (
               id INTEGER PRIMARY KEY, 
@@ -320,6 +321,18 @@ def get_card_by_name(name):
 def get_card_by_id(id): 
     return simple_command_fetchone('''SELECT * FROM card WHERE id = ?''', (id,))
 
+def get_card_amount(token, card_id):
+    try:
+        user_id, status = validate_token(token)
+        if status.get('status') != 200:
+            return status
+        
+        card_amount = simple_command_fetchone('''SELECT amount FROM user_cards WHERE user_id = ? AND card_id = ?''', (user_id, card_id))
+        return card_amount[0]
+    except:
+        return 0
+    
+
 def get_card_info(card_name):
     try:
         card = simple_command_fetchone('''SELECT * FROM card WHERE card_name = ?''', (card_name,))
@@ -342,7 +355,14 @@ def get_card_info(card_name):
 def add_card_to_user(user_id, card_id):
     try:
         conn, c = get_db_connection()
-        c.execute('''INSERT INTO user_cards (user_id, card_id) VALUES (?, ?)''', (user_id, card_id))
+        
+        #Check if the user already has 3 of this card
+        card_amount = c.execute('''SELECT amount FROM user_cards WHERE user_id = ? AND card_id = ?''', (user_id, card_id)).fetchone()
+        if(card_amount and card_amount[0] >= 3):
+            conn.close()
+            return {"status": 500, "message": "User already has 3 of this card", "command": "error"}
+        
+        c.execute('''INSERT INTO user_cards (user_id, card_id, amount) VALUES (?, ?, ?)''', (user_id, card_id, 1))
         conn.commit()
         conn.close()
         return {"status": 200, "message": "Success", "command": "add_card_to_user"}
@@ -416,16 +436,37 @@ def get_active_deck(user_id):
     conn.close()
     return deck
 
-def add_card_to_deck(deck_id, card_id):
+def add_card_to_deck(deck_id, card_id):  
     try:
         conn, c = get_db_connection()
         
+        if(not card_id):
+            return {"status": 500, "message": "Card not found", "command": "error"}
+        
+        if not deck_id:
+            conn.close()
+            return {"status": 500, "message": "Deck not found", "command": "error"}
+        
         #Check if deck has 9 cards
-        card_amount = get_card_amount_in_deck(deck_id)
-        if(card_amount >= 9):
+        deck_card_amount = get_card_amount_in_deck(deck_id)
+        if(deck_card_amount >= 9):
             conn.close()
             return {"status": 500, "message": "Deck already has 9 cards", "command": "error"}
-
+        
+        #Check how many in user_cards the user has
+        card_amount = c.execute('''SELECT amount FROM user_cards WHERE user_id = ? AND card_id = ?''', (get_deck_by_id(deck_id)[2], card_id)).fetchone()
+        
+        #check how many of this card is in the deck
+        in_card_amount = c.execute('''SELECT COUNT(*) FROM deck_cards WHERE deck_id = ? AND card_id = ?''', (deck_id, card_id)).fetchone()
+        
+        if(card_amount[0] - in_card_amount[0] == 0):
+            return {"status": 500, "message": "User has no more of this card", "command": "error"}
+        
+        if(in_card_amount[0] == 3):
+            return {"status": 500, "message": "Deck already has 3 of this card", "command": "error"}
+        
+        #Add card to deck
+    
         c.execute('''INSERT INTO deck_cards (deck_id, card_id) VALUES (?, ?)''', (deck_id, card_id))
         conn.commit()
         conn.close()
@@ -439,11 +480,16 @@ def remove_card_from_deck(deck_id, card_id):
         deck = get_deck_by_id(deck_id)
         if deck[4] == 1:
             return {"status": 500, "message": "Cannot remove card from default deck", "command": "error"}
+        
+        #check if deck exists
+        if not deck:
+            return {"status": 500, "message": "Deck not found", "command": "error"}
         conn, c = get_db_connection()
         c.execute('''DELETE FROM deck_cards WHERE deck_id = ? AND card_id = ?''', (deck_id, card_id))
         conn.commit()
         conn.close()
-        return {"status": 200, "message": "Success", "command": "remove_card_from_deck"}
+        
+        return {"status": 200, "message": "Success", "command": "remove_card_from_deck", "card_name": get_card_by_id(card_id)[1], "deck_name": deck[1]}
     except Exception as e:
         return {"status": 500, "message": "failure to remove card from deck", "command": "error"}
 
@@ -481,6 +527,7 @@ def get_deck_info(token, deck_id):
         
         return {"status": 200, "message": "Success", "command": "check_deck", "deck_name": deck_name, "cards": card_list, "active": active}
     except Exception as e:
+        print(str(e))
         return {"status": 500, "message": "failure to get deck info", "command": "error"}
             
     

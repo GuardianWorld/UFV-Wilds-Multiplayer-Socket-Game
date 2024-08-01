@@ -133,7 +133,7 @@ def receive_message(client_socket):
             elif(command == "check_cards"):
                 cards = response_json.get('cards')
                 for card in cards:
-                    print(f"[*] Card: {card}")
+                    print(f"[*] Card: {card[0]} Amount: {card[1]}")
             
             elif(command == "create_deck"):
                 deck_name = response_json.get('deck_name')
@@ -335,7 +335,6 @@ def create_deck(message, token):
     deck_name = parts[1]
     return True, {"token": token, "message": "Creating deck", "command": "create_deck", "deck_name": deck_name}
 
-
 def delete_deck(message, token):
     if(not token):
         return False, {"token": token, "message": "Not logged in", "command": "error"}
@@ -351,8 +350,9 @@ def add_card_to_deck(message, token):
     if(not token):
         return False, {"token": token, "message": "Not logged in", "command": "error"}
     
-    parts = message.split(' ', 3)
-    if(len(parts) != 4):
+    parts = message.split(' ', 2)
+    print(parts)
+    if(len(parts) != 3):
         return False, {"token": token, "message": "Invalid input", "command": "error"}
     
     deck_name = parts[1]
@@ -364,8 +364,8 @@ def remove_card_from_deck(message, token):
     if(not token):
         return False, {"token": token, "message": "Not logged in", "command": "error"}
     
-    parts = message.split(' ', 3)
-    if(len(parts) != 4):
+    parts = message.split(' ', 2)
+    if(len(parts) != 3):
         return False, {"token": token, "message": "Invalid input", "command": "error"}
     
     deck_name = parts[1]
