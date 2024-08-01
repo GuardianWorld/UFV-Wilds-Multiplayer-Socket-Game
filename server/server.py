@@ -55,7 +55,7 @@ def start_server(host, port):
     
     terminal.join()
     match_thread.join()
-    shutdown_server()
+    shutdown_server(1)
     server_socket.close()
 
 #Shutdown Server
@@ -97,6 +97,8 @@ def internal_server_terminal():
                 terminal_config()     
             elif command == "ban":
                 terminal_user_ban()      
+            elif command == "delete user":
+                terminal_delete_user()
             elif command == "help":
                 print("[*] Available commands: ")
                 print(" >> shutdown - Stops the server.")
@@ -109,6 +111,7 @@ def internal_server_terminal():
                 print(" >> database search - Search the database for information.")
                 print(" >> config - Shows server configuration.")
                 print(" >> ban - Ban/Unbans a user.")
+                print(" >> delete user - Deletes a user.")
                 print(" >> help - Shows this message.")
             else:
                 print("[*] Invalid command. Type 'help' for available commands.")
@@ -129,8 +132,12 @@ def terminal_config():
         print(f" >> log level - Sets the log level. Current: {log_event_level}")
         print(" >> add card - Adds a card to the database.")
         print(" >> add test cards - Adds test cards to the database.")
+        print(" >> delete card - Deletes a card from the database.")
+        print(" >> check card - Checks a card in the database.")
+        print(" >> all cards - Shows all cards in the database.")
         print(" >> exit - Exits configuration.")
         command = input("[config] >> ")
+        print("")
         if(command == "log level"):
             print("    > 0 - No logs.")
             print("    > 1 - Player Logins")
@@ -148,6 +155,12 @@ def terminal_config():
             value = int(input("[config] > Number of test cards: "))
             for i in range(value):
                 add_test_cards()
+        elif(command == "delete card"):
+            delete_card()
+        elif(command == "check card"):
+            search_card()
+        elif(command == "all cards"):
+            all_cards()
 
 def terminal_status():
     number_of_sockets = len(active_connections)
@@ -219,13 +232,49 @@ def terminal_search():
             all_cards()
         elif(command == "all_users"):
             all_users()
-    
+
+def terminal_delete_user():
+    print("[*] Delete a user by username.")
+    username = input("[delete user] >> ")
+    user = database.get_user(username)
+    if(user):
+        print(f"User: {user}")
+        print("Delete user? [y/n]")
+        confirm = input("[delete user] >> ")
+        if(confirm == "y"):
+            database.delete_user(username)
+            print("User deleted.")
+            return
+        print("User not deleted.")
+        return
+    else:
+        print("User not found.")
+  
 def search_card():
     print("[*] Search for cards by name.")
     card_name = input("[search card] >> ")
-    card = database.get_card(card_name)
+    card = database.get_card_by_name(card_name)
     if(card):
-        print(f"Card: {card}")
+        card_name = card[1]
+        forca =     card[2]
+        fofura =    card[3]
+        velocidade =card[4]
+        tamanho =   card[5]
+        idade =     card[6]
+        tipo =      card[7]
+        card_group =card[8]
+        card_image =card[9]
+        
+        print(f"Card: {card_name}")
+        print(f"Grupo: {card_group}")
+        print(f"Força: {forca}")
+        print(f"Fofura: {fofura}")
+        print(f"Velocidade: {velocidade}")
+        print(f"Tamanho: {tamanho}")
+        print(f"Idade: {idade}")
+        print(f"Tipo: {tipo}")
+        print(f"Imagem: {card_image}")
+
     else:
         print("Card not found.")    
         
@@ -233,7 +282,26 @@ def all_cards():
     print("[*] All cards.")
     cards = database.get_all_cards()
     for card in cards:
-        print(f" >> {card}")
+        card_name = card[1]
+        card_group =card[2]
+        forca =     card[3]
+        fofura =    card[4]
+        velocidade =card[5]
+        tamanho =   card[6]
+        idade =     card[7]
+        tipo =      card[8]
+        card_image =card[9]
+        
+        print(f"Card: {card_name}")
+        print(f"Grupo: {card_group}")
+        print(f"Força: {forca}")
+        print(f"Fofura: {fofura}")
+        print(f"Velocidade: {velocidade}")
+        print(f"Tamanho: {tamanho}")
+        print(f"Idade: {idade}")
+        print(f"Tipo: {tipo}")
+        print(f"Imagem: {card_image}")
+        print("")
 
 def search_user():
     print("[*] Search for player information by username.")
@@ -340,30 +408,106 @@ def handle_response(data, client_address, client_socket):
     token = data.get('token')
     response = {}
 
+    
     if(command == "ping"):
         response = {"status": 200, "message": "pong", "command": "pong"}
+        
     elif(command == "logoff"):
         if(log_event_level >= 4):
             print(f"[*] Logoff: {client_address[0]}:{client_address[1]}")
         response = {"status": 200, "message": "Goodbye!", "command": "logoff"}
+        
     elif(command == "chat"):
         if(log_event_level >= 5):
             print(f"[*] Chat message received: {message}")
         response = {"status": 200, "message": message, "command": "chat"}
+        
     elif(command == "register"):
         if(log_event_level >= 2):
             print(f"[*] Registration request received, User: {data.get('username')}")
         response = register(data.get('username'), data.get('password'), client_address)
+        
     elif(command == "login"):
         if(log_event_level >= 1):
             print(f"[*] Receiving login from user: {data.get('username')}")
         response = login(data.get('username'), data.get('password'), client_address)
+        
+    elif(command == "check_cards"):
+        user_id = database.get_user_id(logged_users.get(client_address))[0]
+        cards_from_user_cards = database.get_user_cards(user_id)
+        card_list = []
+        for card_v in cards_from_user_cards:
+            #Get the card Name
+            card = database.get_card_by_id(card_v[0])
+            card_name = card[1]
+            card_list.append(card_name)
+            
+        response = {"status": 200, "message": "cards found:", "command": "check_cards", "cards": card_list}
+    
+    elif(command == "check_card"):
+        response = database.get_card_info(data.get('card_name'))
+        
     elif(command == "check_decks"):
         response = check_decks(logged_users.get(client_address))
+        
     elif(command == "activate_deck"):
         user_id = database.get_user_id(logged_users.get(client_address))[0]
-        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)[0]
+        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
+        if(deck_id == None):
+            response = {"status": 500, "message": "Deck not found", "command": "error"}
+        else:
+            deck_id = deck_id[0]
         response = database.activate_deck(token, deck_id)
+    
+    elif(command == "create_deck"):
+        user_id = database.get_user_id(logged_users.get(client_address))[0]
+        deck_name = data.get('deck_name')
+        response = database.add_deck(user_id, deck_name)
+    
+    elif(command == "add_card_to_deck"):
+        user_id = database.get_user_id(logged_users.get(client_address))[0]
+        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
+        if(deck_id == None):
+            response = {"status": 500, "message": "Deck not found", "command": "error"}
+        else:
+            deck_id = deck_id[0]
+        card_id = database.get_card_id(data.get('card_name'))
+        if(card_id == None):
+            response = {"status": 500, "message": "Card not found", "command": "error"}
+        else:
+            card_id = card_id[0]
+        response = database.add_card_to_deck(deck_id, card_id)
+    
+    elif(command == "remove_card_from_deck"):
+        user_id = database.get_user_id(logged_users.get(client_address))[0]
+        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
+        if(deck_id == None):
+            response = {"status": 500, "message": "Deck not found", "command": "error"}
+        else:
+            deck_id = deck_id[0]
+        card_id = database.get_card_id(data.get('card_name'))
+        if(card_id == None):
+            response = {"status": 500, "message": "Card not found", "command": "error"}
+        else:
+            card_id = card_id[0]
+        response = database.remove_card_from_deck(deck_id, card_id)
+    
+    elif(command == "delete_deck"):
+        user_id = database.get_user_id(logged_users.get(client_address))[0]
+        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
+        if(deck_id == None):
+            response = {"status": 500, "message": "Deck not found", "command": "error"}
+        else: 
+            response = database.delete_deck(token, deck_id[0])
+    
+    elif(command == "check_deck"):
+        user_id = database.get_user_id(logged_users.get(client_address))[0]
+        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
+        if(deck_id != None):
+            response = database.get_deck_info(token,deck_id[0])
+        else:
+            response = {"status": 500, "message": "Deck not found", "command": "error"}
+        
     elif(command == "match_search"):
         username = logged_users.get(client_address)
         if(username == None):
@@ -371,26 +515,20 @@ def handle_response(data, client_address, client_socket):
         if(log_event_level >= 3):
             print(f"[*] Match request received from: {username}")
         response = match.waiting_for_match(username, client_socket)
+        
     else:
         response = {"status": 401, "message": "Invalid Command", "command": "none"}
 
     return response
-    
-    
+
 def check_decks(username):
-    print("check decks")
     user_id = database.get_user_id(username)[0]
-    print(user_id)
     if(user_id == None):
         return {"status": 500, "message": "User not found", "command": "error"}
     
     decks = database.get_user_decks(user_id)
-    print(decks)
     if(decks == None):
         return {"status": 500, "message": "No decks found", "command": "error"}
-    
-    #unpack tuple into a list to be able to serialize
-
     
     return {"status": 200, "message": "decks found:", "command": "check_decks", "decks": decks}
 
@@ -408,15 +546,23 @@ def register(username, password, client_address):
             return {"status": 500, "message": "Password too short", "command": "error"}
         cards_9 = database.get_9_random_cards()
         result = database.add_user(username, password)
-        
+        user_id = database.get_user_id(username)[0]
         # Add the cards to the new user
         for card in cards_9:
-            database.add_card_to_user(card[0], result['id'])
+            database.add_card_to_user(user_id, card[0])
         
         # Add a default deck
-        database.add_deck(result['id'], "Default", 1)
-        deck_id = database.get_deck_id(result['id'], "Default")
-        database.make_deck_active(result['id'], deck_id)
+        database.add_deck(user_id, "Default", 1)
+        
+        #grab deck id
+        deck_id = database.get_deck_id_by_name("Default", user_id)
+        print(deck_id)
+        
+        #add the cards to the deck
+        for card in cards_9:
+            database.add_card_to_deck(deck_id[0], card[0])
+        
+        database.make_deck_active(user_id, deck_id)
         
         return result
 
@@ -441,7 +587,7 @@ def add_card_to_deck(username, deck_name, card_name):
     if(user_id == None):
         return {"status": 500, "message": "User not found", "command": "error"}
     
-    deck_id = database.get_deck_id(user_id, deck_name)
+    deck_id = database.get_deck_id_by_name(user_id, deck_name)
     if(deck_id == None):
         return {"status": 500, "message": "Deck not found", "command": "error"}
     
@@ -460,7 +606,7 @@ def remove_card_from_deck(username, deck_name, card_name):
     if(user_id == None):
         return {"status": 500, "message": "User not found", "command": "error"}
     
-    deck_id = database.get_deck_id(user_id, deck_name)
+    deck_id = database.get_deck_id_by_name(user_id, deck_name)
     if(deck_id == None):
         return {"status": 500, "message": "Deck not found", "command": "error"}
     
@@ -482,15 +628,15 @@ def add_cards():
         print("Error: Card Already Exists")
         return
     card_group = input(">> Grupo da Carta: ")
-    forca = input(">> Força [0-10]: ")
-    fofura = input(">> Fofura [0-10]: ")
-    velocidade = input(">> Velocidade [0-10]: ")
-    tamanho = input(">> Tamanho[1-5]: ")
-    idade = input(">> Idade[1-4]: ")
-    tipo = input(">> Tipo[1-3] [Terrestre, Voador, Aquatico]: ")
+    forca = int(input(">> Força [0-10]: "))
+    fofura = int(input(">> Fofura [0-10]: "))
+    velocidade = int(input(">> Velocidade [0-10]: "))
+    tamanho = int(input(">> Tamanho[1-5] [Minusculo, Pequeno, Medio, Grande, Enorme]: "))
+    idade = int(input(">> Idade[1-4] [Jovem, Adolescente, Adulto, Anciao]: "))
+    tipo = int(input(">> Tipo[1-3] [Terrestre, Voador, Aquatico]: "))
     card_image = input(">> Nome da carta [arquivo]: ")
     path = "/StreamingAssets/" + card_image + ".png"
-    
+    print("")
     #verify cards attributes as valid
     if(forca < 0 or forca > 10):
         print("Error: Força")
@@ -501,15 +647,11 @@ def add_cards():
     if(velocidade < 0 or velocidade > 10):
         print("Error: Velocidade")
         return
-    if(tamanho < 1 or tamanho > 5):
-        print("Error: Tamanho")
-        return
-    if(idade < 1 or idade > 4):
-        print("Error: Idade")
-        return
-    if(tipo < 1 or tipo > 3):
-        print("Error: Tipo")
-        return
+    
+    tamanho = tamanho_dict[tamanho]
+    idade = idade_dict[idade]
+    tipo = Tipo_dict[tipo]
+            
     
     #Confirm card
     print("Nome: ", card_name)
@@ -517,11 +659,11 @@ def add_cards():
     print("Força: ", forca)
     print("Fofura: ", fofura)
     print("Velocidade: ", velocidade)
-    print("Tamanho: ", tamanho_dict[tamanho])
-    print("Idade: ", idade_dict[idade])
-    print("Tipo: ", Tipo_dict[tipo])
+    print("Tamanho: ", tamanho)
+    print("Idade: ", idade)
+    print("Tipo: ", tipo)
     print("Imagem: ", path)
-    
+    print("")
     print("Add card? [y/n]")
     confirm = input()
     if(confirm == "n"):
@@ -529,7 +671,6 @@ def add_cards():
         return
     
     database.add_card(card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, path)
-
 
 def add_test_cards():
     tamanho_dict = {1: "Minusculo", 2: "Pequeno", 3: "Medio", 4: "Grande", 5: "Enorme"}
@@ -551,7 +692,14 @@ def add_test_cards():
             print(f"[*] Card Already Exists {card_name}")
             continue
         else:
-            result = database.add_card(card_name, card_group, forca, fofura, velocidade, tamanho_dict[tamanho], idade_dict[idade], Tipo_dict[tipo], path)
+            #get tamanho,idade and tipo as STRING
+            tamanho = tamanho_dict[tamanho]
+            idade = idade_dict[idade]
+            tipo = Tipo_dict[tipo]
+            
+            print(tamanho)
+            
+            result = database.add_card(card_name, card_group, forca, fofura, velocidade, tamanho, idade, tipo, path)
             if(result['status'] == 200):
                 print(f"[*] Card Added: {card_name}")
                 print(f"[*] Força: {forca}")
@@ -564,7 +712,21 @@ def add_test_cards():
                 print(f"[*] Imagem: {path}\n")
             break
         
-    
+def delete_card():
+    print("[*] Deleting card from database.")
+    card_name = input(">> Card Name: ")
+    card = database.get_card_by_name(card_name)
+    if(card):
+        print(f"Card: {card}")
+        print("Delete card? [y/n]")
+        confirm = input()
+        if(confirm == "y"):
+            print(database.delete_card(card_name))
+            return
+        print("Card not deleted.")
+        return
+    else:
+        print("Card not found.")
 
 if __name__ == "__main__":
     host = ""

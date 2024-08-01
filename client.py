@@ -33,18 +33,54 @@ def package_message(message, token="none"):
             send_status, json_message = login(message, token)
         elif(command == "match_search"):
             send_status, json_message = match_search(token)           
+        elif(command == "check_cards"):
+            json_message = {"token": token, "message": "", "command": "check_cards"}
+        elif(command == "check_card"):
+            card_name = full_message[1]
+            json_message = {"token": token, "message": "", "command": "check_card", "card_name": card_name}
         elif(command == "activate_deck"):
             deck_name = full_message[1]
             json_message = {"token": token, "message": "", "command": "activate_deck", "deck_name": deck_name}
         elif(command == "check_decks"):
-            json_message = {"token": token, "message": "", "command": "check_decks"}         
+            send_status, json_message = check_decks(token)
+        elif(command == "add_card_to_deck"):
+            send_status, json_message = add_card_to_deck(message, token)
+        elif(command == "remove_card_from_deck"):
+            send_status, json_message = remove_card_from_deck(message, token)
+        elif(command == "create_deck"):
+            send_status, json_message = create_deck(message, token)
+        elif(command == "delete_deck"):
+            send_status, json_message = delete_deck(message,token)
+        elif(command == "check_deck"):
+            send_status, json_message = check_deck(message, token)
+        elif(command == "help"):
+            help()
+            send_status = False
+            json_message = {"token": token, "message": "", "command": "chat"}
         else:
             json_message = {"token": token, "message": message, "command": "chat"}
+        
     except Exception as e:
                 json_message = {"token": token, "message": f"Error: {str(e)}", "command": "error"}
                 send_status = False
 
     return send_status, json_message
+
+def help():
+    print("Commands:")
+    print("register <username> <password>: Register a new user")
+    print("login <username> <password>: Login with a user")
+    print("match_search: Search for a match")
+    print("check_cards: Check all cards")
+    print("check_card <card_name>: Check a specific card")
+    print("create_deck <deck_name>: Create a new deck")
+    print("delete_deck <deck_name>: Delete a deck")
+    print("activate_deck <deck_name>: Activate a deck")
+    print("add_card_to_deck <deck_name> <card_name>: Add a card to a deck")
+    print("remove_card_from_deck <deck_name> <card_name>: Remove a card from a deck")
+    print("check_decks: Check all decks")
+    print("check_deck <deck_name>: Check a specific deck")
+    print("exit: Close the client")
 
 def receive_message(client_socket):
     global stop_event
@@ -63,7 +99,7 @@ def receive_message(client_socket):
             message = response_json.get('message')
             command = response_json.get('command')
             
-            print(f"[*] Received: {response_json}")
+            # print(f"[*] Received: {response_json}")
             if(command == "ping"):
                 continue
             elif(command == "login"):
@@ -75,6 +111,38 @@ def receive_message(client_socket):
                 sleep(0.2)
                 stop_event.set()
                 return
+            
+            elif(command == "check_card"):
+                card_name = response_json.get('card_name')
+                forca = response_json.get('forca')
+                fofura = response_json.get('fofura')
+                velocidade = response_json.get('velocidade')
+                tamanho = response_json.get('tamanho')
+                idade = response_json.get('idade')
+                tipo = response_json.get('tipo')
+                imagem = response_json.get('imagem')
+                print(" > Card: ", card_name)
+                print(" > Forca: ", forca)
+                print(" > Fofura: ", fofura)
+                print(" > Velocidade: ", velocidade)
+                print(" > Tamanho: ", tamanho)
+                print(" > Idade: ", idade)
+                print(" > Tipo: ", tipo)
+                print(" > Imagem: ", imagem)
+            
+            elif(command == "check_cards"):
+                cards = response_json.get('cards')
+                for card in cards:
+                    print(f"[*] Card: {card}")
+            
+            elif(command == "create_deck"):
+                deck_name = response_json.get('deck_name')
+                print(f"[*] Deck {deck_name} created")
+            
+            elif(command == "delete_deck"):
+                deck_name = response_json.get('deck_name')
+                print(f"[*] Deck {deck_name} deleted")
+            
             elif(command == "check_decks"):
                 decks = response_json.get('decks')
                 for deck in decks:
@@ -89,10 +157,30 @@ def receive_message(client_socket):
                     else:
                         default = "No"
                     print(f"[*] Deck Name: {deck_name}, Active: {active}, Default: {default}")
-                print(f"[*] Decks: {decks}")
+
+            elif(command == "check_deck"):
+                deck = response_json.get('deck_name')
+                cards = response_json.get('cards')
+                active = response_json.get('active')
+                
+                print(f"[*] Deck: {deck}, Active: {active}")
+                for card in cards:
+                    print(f"[*] Card: {card}")                
+            
             elif(command == "activate_deck"):
                 deck_name = response_json.get('deck_name')
                 print(f"[*] Deck {deck_name} activated")
+                
+            elif(command == "add_card_to_deck"):
+                card_name = response_json.get('card_name')
+                deck_name = response_json.get('deck_name')
+                print(f"[*] Card {card_name} added to deck {deck_name}")
+                
+            elif(command == "remove_card_from_deck"):
+                card_name = response_json.get('card_name')
+                deck_name = response_json.get('deck_name')
+                print(f"[*] Card {card_name} removed from deck {deck_name}")
+                
             elif(command == "match_start"):
                 player_1 = response_json.get('player_1')
                 player_2 = response_json.get('player_2')
@@ -235,7 +323,71 @@ def match_search(token):
         return False, {"token": token, "message": "Already searching for match", "command": "error"}
     searching_for_match = True
     return True, {"token": token, "message": "Match Search", "command": "match_search"} 
+
+def create_deck(message, token):
+    if(not token):
+        return False, {"token": token, "message": "Not logged in", "command": "error"}
     
+    parts = message.split(' ', 2)
+    if(len(parts) != 2):
+        return False, {"token": token, "message": "Invalid input", "command": "error"}
+    
+    deck_name = parts[1]
+    return True, {"token": token, "message": "Creating deck", "command": "create_deck", "deck_name": deck_name}
+
+
+def delete_deck(message, token):
+    if(not token):
+        return False, {"token": token, "message": "Not logged in", "command": "error"}
+    
+    parts = message.split(' ', 2)
+    if(len(parts) != 2):
+        return False, {"token": token, "message": "Invalid input", "command": "error"}
+    
+    deck_name = parts[1]
+    return True, {"token": token, "message": "Deleting deck", "command": "delete_deck", "deck_name": deck_name}    
+
+def add_card_to_deck(message, token):
+    if(not token):
+        return False, {"token": token, "message": "Not logged in", "command": "error"}
+    
+    parts = message.split(' ', 3)
+    if(len(parts) != 4):
+        return False, {"token": token, "message": "Invalid input", "command": "error"}
+    
+    deck_name = parts[1]
+    card_name = parts[2]
+    
+    return True, {"token": token, "message": "Adding card to deck", "command": "add_card_to_deck", "deck_name": deck_name, "card_name": card_name}
+
+def remove_card_from_deck(message, token):
+    if(not token):
+        return False, {"token": token, "message": "Not logged in", "command": "error"}
+    
+    parts = message.split(' ', 3)
+    if(len(parts) != 4):
+        return False, {"token": token, "message": "Invalid input", "command": "error"}
+    
+    deck_name = parts[1]
+    card_name = parts[2]
+    
+    return True, {"token": token, "message": "Removing card from deck", "command": "remove_card_from_deck", "deck_name": deck_name, "card_name": card_name}
+
+def check_decks(token):
+    if(not token):
+        return False, {"token": token, "message": "Not logged in", "command": "error"}
+    return True, {"token": token, "message": "Checking decks", "command": "check_decks"}
+    
+def check_deck(message, token):
+    if(not token):
+        return False, {"token": token, "message": "Not logged in", "command": "error"}
+    
+    parts = message.split(' ', 2)
+    if(len(parts) != 2):
+        return False, {"token": token, "message": "Invalid input", "command": "error"}
+    
+    deck_name = parts[1]
+    return True, {"token": token, "message": "Checking deck", "command": "check_deck", "deck_name": deck_name}
 
 #Send IMAGES
 def image_to_b64(image_path):
