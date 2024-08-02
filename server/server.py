@@ -1,4 +1,5 @@
 from os import getcwd
+import argparse
 import random
 import sys
 import socket
@@ -7,11 +8,16 @@ import threading
 import time
 import datetime
 import signal
+import hashlib
+import base64
+import os
 
 
 import database
 from config import active_connections, stop_event, logged_users, searching_for_match, match_rooms, log_event_level
 import match
+
+files = []
 
 #Signal Handling
 def signal_handler(sig, frame):
@@ -23,9 +29,21 @@ signal.signal(signal.SIGTERM, signal_handler)
 #Start Server
 def start_server(host, port):
 
+    print("[*] Starting server...")
+    print("[*] Loading StreamingAssets...")
+    time.sleep(1)
+    list_files(getcwd() + "/StreamingAssets")
+    print("[*] StreamingAssets loaded.")
+    
+    if(log_event_level >= 5):
+        print("[*] StreamingAssets: ")
+        for file in files:
+            print(f" > {file[0]} - Checksum: {file[1]}")
+        
     #Open DB
+    print("[*] Initializing database...")
     database.init_db()
-
+    
     #Open connection
     try:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -35,8 +53,10 @@ def start_server(host, port):
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)
-
+ 
+    print("[*] Server started.")
     print(f"[*] Listening on {host}:{port}")
+    print(f"[*] Log Level: {log_event_level}")  
 
     terminal = threading.Thread(target=internal_server_terminal)
     terminal.start()
@@ -64,6 +84,7 @@ def shutdown_server(timeout=5):
     stop_event.set()
     time.sleep(timeout)
     for _, client_socket, _ in active_connections.items():
+        client_socket.send(json.dumps({"status": 200, "message": "Server is shutting down.", "command": "serverside_logoff"}).encode())
         client_socket.close()
     sys.exit(0)
 
@@ -71,7 +92,6 @@ def shutdown_server(timeout=5):
 
 def internal_server_terminal():
     global log_event_level
-    log_event_level = 5
     print("[*] Server terminal started.")
     while not stop_event.is_set():
         try:
@@ -94,7 +114,9 @@ def internal_server_terminal():
             elif command == "database search":
                 terminal_search()
             elif command == "config":
-                terminal_config()     
+                terminal_config() 
+            elif command == "kick":
+                terminal_kick()    
             elif command == "ban":
                 terminal_user_ban()      
             elif command == "delete user":
@@ -110,6 +132,7 @@ def internal_server_terminal():
                 print(" >> searching - Shows users searching for match.")
                 print(" >> database search - Search the database for information.")
                 print(" >> config - Shows server configuration.")
+                print(" >> kick - Kicks a user.")
                 print(" >> ban - Ban/Unbans a user.")
                 print(" >> delete user - Deletes a user.")
                 print(" >> help - Shows this message.")
@@ -354,6 +377,19 @@ def terminal_user_ban():
     
     print("Operation canceled.")
 
+def terminal_kick():
+    print("[*] Disconnects a user by username.")
+    username = input("[kick] >> Username: ")
+    reason = input("[kick] >> Reason: ")
+    
+    for client_address, user in logged_users.items():
+        if user == username:
+            client_socket = (active_connections[client_address])[0]
+            
+            client_socket.send(json.dumps({"status": 200, "message": reason, "command": "serverside_logoff"}).encode())
+            return
+    
+
 #endregion
 
 #Server-Client Side
@@ -382,8 +418,10 @@ def handle_client(client_socket, client_address):
                 if not request:
                     break
                 data = json.loads(request.decode())
-                response = json.dumps(handle_response(data, client_address, client_socket))
-                client_socket.send(response.encode())
+                response = handle_response(data, client_address, client_socket)
+                response_json = json.dumps(response)      
+                          
+                client_socket.send(response_json.encode())
             except socket.timeout:
                 continue
     except Exception as e:
@@ -398,6 +436,7 @@ def handle_client(client_socket, client_address):
             if(match.player_searching(username)):
                 del searching_for_match[username]
             del logged_users[client_address]
+            print(f"[*] User {username} logged off.")
         if(log_event_level >= 4):
             print(f"[*] Connection closed from: {client_address[0]}:{client_address[1]}")
 
@@ -411,6 +450,44 @@ def handle_response(data, client_address, client_socket):
     
     if(command == "ping"):
         response = {"status": 200, "message": "pong", "command": "pong"}
+    
+    if(command == "request_images"):
+        #verify Token for safety
+        user_id, status = database.validate_token(token)
+        if(status.get('status') != 200):
+            return {"status": 401, "message": "Invalid Token", "command": "error"}
+        
+        if(log_event_level >= 5):
+            print(f"[*] Files Requested from: {client_address[0]}:{client_address[1]}")
+        
+        for file in files:
+            image_path, checksum = file
+            response_json = json.dumps({"status": 200, "message": "images", "command": "request_images", "image": image_path, "checksum": checksum})
+            client_socket.send(response_json.encode())
+            #confirm the image was sent
+            confirm = client_socket.recv(2048).decode()
+            confirm = json.loads(confirm)
+            if(confirm.get('command') == "image_received"):
+                continue
+        response = {"status": 200, "message": "images", "command": "request_images_end"}
+        print(f"[*] File List sent to: {client_address[0]}:{client_address[1]}")
+        
+    elif(command == "download_images"):
+        user_id, status = database.validate_token(token)
+        if(status.get('status') != 200):
+            return {"status": 401, "message": "Invalid Token", "command": "error"}
+        
+                
+        if(log_event_level >= 5):
+            print(f"[*] Sending image {data.get('image_path')} to: {client_address[0]}:{client_address[1]}")   
+            
+        streaming_assets_folder = getcwd() + "/StreamingAssets/"
+        
+        if(os.name == 'nt'):
+            streaming_assets_folder = streaming_assets_folder.replace("/", "\\")
+            
+        image_path = streaming_assets_folder + data.get('image_path')    
+        response = {"status": 200, "message": "images", "command": "file_download", "imageb64": image_to_b64(image_path)}
         
     elif(command == "logoff"):
         if(log_event_level >= 4):
@@ -431,6 +508,8 @@ def handle_response(data, client_address, client_socket):
         if(log_event_level >= 1):
             print(f"[*] Receiving login from user: {data.get('username')}")
         response = login(data.get('username'), data.get('password'), client_address)
+        if(response['status'] == 200):
+            print(f"[*] User {data.get('username')} logged in.")
         
     elif(command == "check_cards"):
         user_id = database.get_user_id(logged_users.get(client_address))[0]
@@ -525,17 +604,6 @@ def handle_response(data, client_address, client_socket):
 
     return response
 
-def check_decks(username):
-    user_id = database.get_user_id(username)[0]
-    if(user_id == None):
-        return {"status": 500, "message": "User not found", "command": "error"}
-    
-    decks = database.get_user_decks(user_id)
-    if(decks == None):
-        return {"status": 500, "message": "No decks found", "command": "error"}
-    
-    return {"status": 200, "message": "decks found:", "command": "check_decks", "decks": decks}
-
 def check_online_user(username):
     for connection, user in logged_users.items():
         if user == username:
@@ -570,7 +638,6 @@ def register(username, password, client_address):
         
         return result
 
-
 def login(username, password, client_address):
     if(check_online_user(username)):
         return {"status": 500, "message": "User already logged in", "command": "error"}
@@ -586,6 +653,18 @@ def make_deck(username, deck_name):
         return {"status": 500, "message": "User not found", "command": "error"}
     return database.add_deck(user_id, deck_name)
     
+def check_decks(username):
+    user_id = database.get_user_id(username)[0]
+    if(user_id == None):
+        return {"status": 500, "message": "User not found", "command": "error"}
+    
+    decks = database.get_user_decks(user_id)
+    if(decks == None):
+        return {"status": 500, "message": "No decks found", "command": "error"}
+    
+    return {"status": 200, "message": "decks found:", "command": "check_decks", "decks": decks}
+
+
 def add_card_to_deck(username, deck_name, card_name):
     user_id = database.get_user_id(username)
     if(user_id == None):
@@ -732,10 +811,37 @@ def delete_card():
     else:
         print("Card not found.")
 
-if __name__ == "__main__":
-    host = ""
-    port = 25555
-    if len(sys.argv) == 2:
-        port = int(sys.argv[1]) 
+#StreamingAsset Functions
+
+def image_to_b64(image_path):
+    with open(image_path, "rb") as image_file:
+        image_b64 = base64.b64encode(image_file.read()).decode('utf-8')
+    return image_b64
+
+def calculate_checksum(file_path, algorithm='sha256'):
+    hash_func = hashlib.new(algorithm)
+    with open(file_path, 'rb') as f:
+        while chunk := f.read(8192):
+            hash_func.update(chunk)
+    return hash_func.hexdigest()
+
+def list_files(directory):  
+    for item in os.listdir(directory):
+        file_path = os.path.join(directory, item)
+        if os.path.isfile(file_path):
+            checksum = calculate_checksum(file_path)
+            files.append((item, checksum))
+
+if __name__ == "__main__":  
+    parser = argparse.ArgumentParser(description="Start the server with specified parameters.")
+    parser.add_argument("-H", "--host", default="localhost", help="The host to bind the server to. Default is connection to LocalHost")
+    parser.add_argument("-p", "--port", type=int, default=25555, help="The port to bind the server to. Default is 25555.")
+    parser.add_argument("-l", "--log", type=int, default=4, help="The log event level. Default is 4 (Player Logins + Register + Matches + Connections). Maximum is 5.")
+    
+    args = parser.parse_args()
+    
+    host = args.host
+    port = args.port
+    log_event_level = args.log
     
     start_server(host, port)

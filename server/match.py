@@ -10,6 +10,7 @@ import database
 from config import active_connections, logged_users, stop_event, searching_for_match, match_rooms, log_event_level
 
 def search_match():
+    print("[*] Matchmaking Server Started.")
     matched_players = []
     while not stop_event.is_set():
         if(len(searching_for_match) >= 3):
@@ -24,6 +25,7 @@ def search_match():
             time.sleep(0.2)
         else:
             time.sleep(3)
+    print("[*] Matchmaking Server Stopped.")
 
 def waiting_for_match(player_name, player_socket):
     searching_for_match[player_name] = player_socket

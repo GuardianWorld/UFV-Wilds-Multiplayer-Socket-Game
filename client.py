@@ -1,17 +1,22 @@
 import base64
 import select
+import hashlib
 import string
 import threading
 import json
 import socket
 import sys
+import os
 from time import sleep
 
 stop_event = threading.Event()
 token = ""
 username = ""
+login_into_server = False
 searching_for_match = False
 on_match = False
+downloading_file = False
+
 
 def close_connection(client_socket):
     print("[*] Disconnected from server.")
@@ -87,6 +92,7 @@ def receive_message(client_socket):
     global username
     global token
     global on_match
+    global login_into_server
     
     while not stop_event.is_set():
         try:
@@ -105,9 +111,18 @@ def receive_message(client_socket):
             elif(command == "login"):
                 token = response_json.get('token')
                 username = response_json.get('username')
-                print(f"[*] Logged in as {username}")
+                login_operation(client_socket)
+            
             elif(command == "logoff"):
                 print(f"[*] Turning off")
+                sleep(0.2)
+                stop_event.set()
+                return
+            
+            elif(command == "serverside_logoff"):
+                reason = response_json.get('message')
+                print(f"[*] You have been disconnected from the server.")
+                print(f"[*] Reason: {reason}")
                 sleep(0.2)
                 stop_event.set()
                 return
@@ -204,17 +219,109 @@ def receive_message(client_socket):
             stop_event.set()
             return
         
+def login_operation(client_socket):
+    global login_into_server 
+    global token
+    server_files = []
+    x = 0
+    
+    login_into_server= True
+    
+    print(f"[*] Logging in...")
+    print(f"[*] Loading... Please wait ")
+    client_socket.send(json.dumps({"token": token, "message": "", "command": "request_images"}).encode())
+    while(True):
+        response = client_socket.recv(4096).decode()
+        response_json = json.loads(response)
+        if(response_json == None):
+            print(f"[*] Empty Packet")
+            continue
+        command = response_json.get('command')
+        if(command == "request_images"):
+            server_files.append((response_json.get('image'), response_json.get('checksum')))
+            client_socket.send(json.dumps({"token": token, "message": "", "command": "image_received"}).encode())
+        elif(command == "request_images_end"):
+            print(f"[*] There exists {len(server_files)} files.")
+            amount, missing_indexes = verify_files(server_files)
+            if(amount == 0):
+                print("[*] All files are up to date.")
+                break
+            else:
+                print(f"[*] Missing {amount} files.")
+                sleep(2)
+                download_files(client_socket, missing_indexes, amount, server_files, token)
+                break
+        else:
+            print(f"[*] Unknown command: {command} {response_json.get('message')}")
+            
+    login_into_server = False
+    
+                
+                        
+def download_files(client_socket, missing_indexes, amount, server_files, token):
+    x = 0
+    for index in missing_indexes:
+        file = server_files[index]
+        
+        package = json.dumps({"token": token, "message": "", "command": "download_images", "image_path": file[0]})
+        client_socket.send(package.encode())
+        print(f"[*] Requesting file: {file[0]} {x} / {amount}")
+        
+        file_data = client_socket.recv(1024 * 1024 * 5).decode() #5MB Buffer for downloading Images
+        file_data_json = json.loads(file_data)
+        
+        if(file_data_json == None):
+            print(f"[*] Empty Packet")
+            continue
+        if(file_data_json.get('command') == "file_download"):
+            path = os.getcwd() + "/StreamingAssets/" + file[0]
+            if(os.name == 'nt'):
+                path = path.replace("/", "\\")
+            imageb64 = file_data_json.get('imageb64')
+            b64_to_image(imageb64, path)
+            print(f"[*] File {path} downloaded.")
+            x += 1
+                    
+def verify_files(server_files):    
+    missing_indexes = []
+    missing_files = 0
+    files = list_files("StreamingAssets")
+    files_checksum = []
+    
+    for file in files:
+        path = os.getcwd() + "/StreamingAssets/" + file
+        if(os.name == 'nt'):
+            path = path.replace("/", "\\")
+        files_checksum.append(calculate_checksum(path))        
 
+    for file in server_files:
+        file_name = file[0]
+        if file_name not in files:
+            missing_files += 1
+            missing_indexes.append(server_files.index(file))
+            print(f"[*] Missing file: {file_name}")
+        else:
+            server_file_checksum = file[1]
+            #check the checksum
+            if(server_file_checksum not in files_checksum):
+                missing_indexes.append(server_files.index(file))
+                missing_files += 1
+                print(f"[*] File {file_name} is outdated or corrupted.")
+
+    return missing_files, missing_indexes
 
 def client_handler(client_socket):
     global stop_event
     global token
     global username
-    try:
-        debugger_auto(client_socket)
-        
+    global login_into_server
+    try:        
         while not stop_event.is_set():
-            message = input("Enter a message: ")
+            if not login_into_server:
+                message = input("Enter a message: ")
+            else:
+                sleep(1)
+                continue
             if(message and not stop_event.is_set()):
                 send_status, packed_message = package_message(message, token)
                 if not send_status:
@@ -230,24 +337,8 @@ def client_handler(client_socket):
         exit(0)
     except Exception as e:
         print(f"[*] Sender Exception: {str(e)}")
-        return
-        
-def debugger_auto(client_socket):  
-    message = ["login mixxs 123456", "login marcos 123456", "login alan 123456", "match_search"]
-
-    for x in range (0, 4):
-        msg = message[x]
-        send_status, packed_message = package_message(msg, token)
-        package = json.dumps(packed_message)
-        client_socket.send(package.encode())
-        sleep(0.25)
-            
+        return            
     
-    
-            
-        
-    
-
 #Start Client
 def start_client(host, port):
     global stop_event
@@ -259,7 +350,9 @@ def start_client(host, port):
         print(f"[*] Connection refused to {host}:{port}")
         sleep(2)
         return
-    print(f"[*] Connected to {host}:{port}")
+    print(f"[*] Connected to {host}:{port}")   
+
+    
 
     client_handler_tread = threading.Thread(target=client_handler, args=(client_socket,))
     client_handler_tread.start()
@@ -389,49 +482,35 @@ def check_deck(message, token):
     deck_name = parts[1]
     return True, {"token": token, "message": "Checking deck", "command": "check_deck", "deck_name": deck_name}
 
-#Send IMAGES
-def image_to_b64(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+#Image functions
+def b64_to_image(b64_string, image_path):
+    with open(image_path, "wb") as file:
+        file.write(base64.b64decode(b64_string))
 
-def send_image(host, port, token, image_path):
-    try:
-        # Convert the image to base64
-        image_base64 = image_to_b64(image_path)
+#Grab all images in /StreamingAssets Folder
 
-        # Create the JSON payload
-        payload = {
-            "token": token,
-            "command": "add_card",
-            "card_name": "SampleCard",
-            "card_group": "Group1",
-            "forca": 10,
-            "fofura": 8,
-            "velocidade": 7,
-            "tamanho": 5,
-            "idade": 3,
-            "tipo": "Fire",
-            "imagem": image_base64
-        }
+def directory_maker(directory="StreamingAssets"):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    elif not os.path.isdir(directory):
+        os.remove(directory)
+        os.makedirs(directory)
+        
+def calculate_checksum(file_path, algorithm='sha256'):
+    hash_func = hashlib.new(algorithm)
+    with open(file_path, 'rb') as f:
+        while chunk := f.read(8192):
+            hash_func.update(chunk)
+    return hash_func.hexdigest()
 
-        # Convert the payload to a JSON string
-        payload_json = json.dumps(payload)
-
-        # Establish socket connection
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((host, port))
-        print(f"[*] Connected to {host}:{port}")
-
-        # Send the JSON payload
-        client_socket.sendall(payload_json.encode('utf-8'))
-
-        # Receive the response from the server
-        response = client_socket.recv(4096)
-        print(f"Received: {response.decode('utf-8')}")
-
-        client_socket.close()
-    except Exception as e:
-        print(f"Error: {e}")
+def list_files(directory):  
+    files = []
+    for item in os.listdir(directory):
+        file_path = os.path.join(directory, item)
+        if os.path.isfile(file_path):
+            files.append(item)
+    return files
+            
 
 
 def offline_commands():
@@ -451,5 +530,6 @@ if __name__ == "__main__":
     #start = offline_commands()
     start = True
     if(start):
+        directory_maker()
         start_client(host, port)
 
