@@ -15,7 +15,7 @@ PRETO = (0, 0, 0)
 ################################################Telas#######################################
 # Cria a janela com um tamanho e altura
 
-def TelaLogin(janela):
+def TelaLogin(janela, message_queue, response_queue):
     pygame.font.init()
     fonte = pygame.font.SysFont('Arial', 40)
 
@@ -39,6 +39,7 @@ def TelaLogin(janela):
     while True:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -92,7 +93,7 @@ def TelaLogin(janela):
 
         pygame.display.flip()
 
-def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3):
+def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3, message_queue, response_queue):
     rodando = True
     jogador1, jogador2, jogador3 = iniciaJogadores(jogador1, jogador2, jogador3)
     fonte = pygame.font.SysFont('Arial', 50)
@@ -112,10 +113,12 @@ def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3):
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 pygame.quit()
+                message_queue.put("exit")
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 if botoes['sair'].collidepoint(mouseX, mouseY):
+                    message_queue.put("exit")
                     pygame.quit()
                     sys.exit()
                 if botoes['jogar'].collidepoint(mouseX, mouseY):

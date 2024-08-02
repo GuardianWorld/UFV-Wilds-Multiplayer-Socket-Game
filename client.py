@@ -22,6 +22,7 @@ def close_connection(client_socket):
 def package_message(message, token="none"):
     global searching_for_match
     full_message = message.split(' ', 1)
+    print(full_message)
     command = full_message[0]
     json_message = {}
     send_status = True
@@ -200,8 +201,12 @@ def start_client(host, port):
     
     if(receive_message_thread.is_alive()):
         receive_message_thread.join()
+    
+    if(client_interface_thread.is_alive()):
+        client_interface_thread.join()
     #alive_thread.join()
     close_connection(client_socket)
+
         
 # Aux Functions
 def register(message, token):
