@@ -122,9 +122,9 @@ def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3, message_queue, respo
                     pygame.quit()
                     sys.exit()
                 if botoes['jogar'].collidepoint(mouseX, mouseY):
-                    JogoPrincipal(janela, [jogador1, jogador2, jogador3])
+                    JogoPrincipal(janela, [jogador1, jogador2, jogador3], message_queue, response_queue)
                 if botoes['montar_baralho'].collidepoint(mouseX, mouseY):
-                    TelaMudarBaralho(janela, [jogador1, jogador2, jogador3])
+                    TelaMudarBaralho(janela, [jogador1, jogador2, jogador3], message_queue, response_queue)
 
         janela.fill(BRANCO)
         titulo = fonte.render('Jogo de Cartas', True, PRETO)
@@ -148,7 +148,7 @@ def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3, message_queue, respo
 #Mostra os baralhos dos jogadores para excluirem ou criarem outro
 
 
-def TelaEscolherAtributo(janela, atributos, turno):
+def TelaEscolherAtributo(janela, atributos, turno, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
     opcoes_atributo = []
 
@@ -169,6 +169,7 @@ def TelaEscolherAtributo(janela, atributos, turno):
 
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -177,7 +178,7 @@ def TelaEscolherAtributo(janela, atributos, turno):
                     if rect.collidepoint(mouseX, mouseY):
                         return atributos[i]  # Retorna o atributo escolhido
 
-def TelaEscolherCarta(janela, cartas, nome_jogador, turno, atributo = 0):
+def TelaEscolherCarta(janela, cartas, nome_jogador, turno, message_queue, response_queue, atributo = 0):
     fonte = pygame.font.SysFont('Arial', 30)
     fonte_jogador = pygame.font.SysFont('Arial', 40)
     opcoes_carta = []
@@ -235,6 +236,7 @@ def TelaEscolherCarta(janela, cartas, nome_jogador, turno, atributo = 0):
 
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -253,7 +255,7 @@ def TelaEscolherCarta(janela, cartas, nome_jogador, turno, atributo = 0):
 
 #olha a seleção de baralhos e escolhe 1
 
-def TelaEscolherBaralho(janela, jogador):
+def TelaEscolherBaralho(janela, jogador, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
     baralhos = jogador['baralhos']
     opcoes_baralho = []
@@ -275,6 +277,7 @@ def TelaEscolherBaralho(janela, jogador):
 
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -284,7 +287,7 @@ def TelaEscolherBaralho(janela, jogador):
                         return baralhos[i]  # Retorna o baralho escolhido
 
 
-def TelaVencedor(janela, nome_jogador_vencedor, turno):
+def TelaVencedor(janela, nome_jogador_vencedor, turno, message_queue, response_queue):
     pygame.font.init()
     fonte = pygame.font.SysFont('Arial', 40)
     fonte_botao = pygame.font.SysFont('Arial', 30)
@@ -312,6 +315,7 @@ def TelaVencedor(janela, nome_jogador_vencedor, turno):
     while True:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -320,7 +324,7 @@ def TelaVencedor(janela, nome_jogador_vencedor, turno):
                     y_botao < mouseY < y_botao + altura_botao):
                     return  # Retorna à tela principal
 
-def TelaMudarBaralho(janela, jogadores):
+def TelaMudarBaralho(janela, jogadores, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
     caixas_texto = [
         {'rect': pygame.Rect(100, 100, 300, 50), 'texto': 'Montar Baralho Jogador 1', 'jogador': jogadores[0]},
@@ -340,6 +344,7 @@ def TelaMudarBaralho(janela, jogadores):
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -352,7 +357,7 @@ def TelaMudarBaralho(janela, jogadores):
                 for caixa in caixas_texto:
                     if caixa['rect'].collidepoint(mouseX, mouseY):
                         jogador = caixa['jogador']  # Obter o jogador da caixa de texto
-                        TelaMontarBaralhoJogador(janela, jogador)
+                        TelaMontarBaralhoJogador(janela, jogador, message_queue, response_queue)
 
         janela.fill((255, 255, 255))  # Cor de fundo branca
 
@@ -369,7 +374,7 @@ def TelaMudarBaralho(janela, jogadores):
         pygame.display.update()
 
 
-def TelaSelecionarCartas(janela, todasCartas):
+def TelaSelecionarCartas(janela, todasCartas, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 20)
     cartas_selecionadas = []
     imagens_cartas = {}
@@ -405,6 +410,7 @@ def TelaSelecionarCartas(janela, todasCartas):
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -455,7 +461,7 @@ def TelaSelecionarCartas(janela, todasCartas):
     return cartas_selecionadas
 
 
-def TelaMostrarCartasBaralho(janela, baralho, jogador):
+def TelaMostrarCartasBaralho(janela, baralho, jogador, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 20)
     imagens_cartas = {}
     posicoes = []
@@ -500,6 +506,7 @@ def TelaMostrarCartasBaralho(janela, baralho, jogador):
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -536,7 +543,7 @@ def TelaMostrarCartasBaralho(janela, baralho, jogador):
 
         pygame.display.update()
 
-def TelaMontarBaralhoJogador(janela, jogador):
+def TelaMontarBaralhoJogador(janela, jogador, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
     caixas_texto = []
     # Função para atualizar a lista de baralhos
@@ -573,6 +580,7 @@ def TelaMontarBaralhoJogador(janela, jogador):
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -581,11 +589,11 @@ def TelaMontarBaralhoJogador(janela, jogador):
                     if caixa['rect'].collidepoint(mouseX, mouseY):
                         if caixa['baralho']:
                             # Mostrar as cartas do baralho selecionado
-                            TelaMostrarCartasBaralho(janela, caixa['baralho'], jogador)
+                            TelaMostrarCartasBaralho(janela, caixa['baralho'], jogador, message_queue, response_queue)
                             atualizar_botoes()  # Atualizar a lista de baralhos após a exclusão
                         else:
                             # Criar um novo baralho
-                            cartas_selecionadas = TelaSelecionarCartas(janela, jogador["todasCartas"])
+                            cartas_selecionadas = TelaSelecionarCartas(janela, jogador["todasCartas"], message_queue, response_queue)
                             cartas_selecionadas = iniciaBaralho(cartas_selecionadas)
                             if len(cartas_selecionadas) > 0:
                                 novo_baralho = {
@@ -613,7 +621,7 @@ def TelaMontarBaralhoJogador(janela, jogador):
 
         pygame.display.update()
 
-def TelaVencedorFinal(janela, nome_vencedor, jogador1, jogador2, jogador3):
+def TelaVencedorFinal(janela, nome_vencedor, jogador1, jogador2, jogador3, message_queue, response_queue):
     # Fonte para o texto do vencedor
     fonte_vencedor = pygame.font.SysFont('Arial', 60)
     fonte_botao = pygame.font.SysFont('Arial', 40)
@@ -633,6 +641,7 @@ def TelaVencedorFinal(janela, nome_vencedor, jogador1, jogador2, jogador3):
 
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
+                message_queue.put("exit")
                 pygame.quit()
                 sys.exit()
             elif evento.type == pygame.MOUSEBUTTONDOWN:
@@ -682,8 +691,8 @@ def iniciaJanela(largura_janela, altura_janela):
     pygame.display.set_caption('Jogo de Cartas')
     return janela
 
-def escolherBaralhosJogadores(jogador, janela):
-    baralho = TelaEscolherBaralho(janela, jogador)
+def escolherBaralhosJogadores(jogador, janela, message_queue, response_queue):
+    baralho = TelaEscolherBaralho(janela, jogador, message_queue, response_queue)
     return baralho
 
 
@@ -738,7 +747,7 @@ def comprarCartas(mao, baralho):
 
     return mao, baralho
 
-def Jogar(janela, jogadores, Mao1, Mao2, Mao3, turno):
+def Jogar(janela, jogadores, Mao1, Mao2, Mao3, turno, message_queue, response_queue):
     ordem_tamanho = ['minusculo', 'pequeno', 'medio', 'grande', 'enorme']
     ordem_idade = ['jovem', 'adolescente', 'adulto', 'anciao']
     ordem_tipo = ['aquatico', 'voador', 'terrestre']
@@ -759,11 +768,11 @@ def Jogar(janela, jogadores, Mao1, Mao2, Mao3, turno):
     texto_jogador = fonte_jogador.render(f"Vez do Jogador: {nome_jogador_aleatorio} no Turno {turno}", True, (0, 0, 0))
     janela.blit(texto_jogador, (50, 10))
 
-    carta_escolhida_aleatoria = TelaEscolherCarta(janela, mao_jogadorAleatorio, nome_jogador_aleatorio, turno)
+    carta_escolhida_aleatoria = TelaEscolherCarta(janela, mao_jogadorAleatorio, nome_jogador_aleatorio, turno, message_queue, response_queue)
     Maos[JogadorAleatorio].remove(carta_escolhida_aleatoria)
     cartas_vencedoras.append(carta_escolhida_aleatoria)
 
-    atributo_escolhido = TelaEscolherAtributo(janela, ['Forca', 'Fofura', 'Velocidade', 'Tamanho', 'Idade', 'Tipo'], turno)
+    atributo_escolhido = TelaEscolherAtributo(janela, ['Forca', 'Fofura', 'Velocidade', 'Tamanho', 'Idade', 'Tipo'], turno, message_queue, response_queue)
 
     # Mapeamento dos atributos
     if atributo_escolhido == 'Tamanho':
@@ -785,7 +794,7 @@ def Jogar(janela, jogadores, Mao1, Mao2, Mao3, turno):
             continue
         nome_jogador = jogadores[i]['nome']
         mao_jogadorOutro = Maos[i]
-        carta_escolhida = TelaEscolherCarta(janela, mao_jogadorOutro, nome_jogador, turno, atributo_escolhido)
+        carta_escolhida = TelaEscolherCarta(janela, mao_jogadorOutro, nome_jogador, turno, message_queue, response_queue, atributo_escolhido)
         if carta_escolhida:
             if atributo_escolhido == 'Tamanho':
                 valor_atributo_outro = ordem_tamanho.index(carta_escolhida[atributo_escolhido])
@@ -814,7 +823,7 @@ def Jogar(janela, jogadores, Mao1, Mao2, Mao3, turno):
 
     return jogador_vencedor['nome'], Mao1, Mao2, Mao3
 
-def JogoPrincipal(janela, jogadores):
+def JogoPrincipal(janela, jogadores, message_queue, response_queue):
     Baralhos = []  # Lista para armazenar todos os baralhos escolhidos
     Mao1 = []
     Mao2 = []
@@ -822,7 +831,7 @@ def JogoPrincipal(janela, jogadores):
 
     # Jogar turno para cada jogador na ordem
     for jogador in jogadores:
-        baralho = escolherBaralhosJogadores(jogador, janela)
+        baralho = escolherBaralhosJogadores(jogador, janela, message_queue, response_queue)
         Baralhos.append(baralho)
 
     turno = 0
@@ -835,7 +844,7 @@ def JogoPrincipal(janela, jogadores):
         Mao3, Baralhos[2]['cartas'] = comprarCartas(Mao3, Baralhos[2]['cartas'])
 
         turno += 1
-        jogador_vencedor, Mao1, Mao2, Mao3 = Jogar(janela, jogadores, Mao1, Mao2, Mao3, turno)
+        jogador_vencedor, Mao1, Mao2, Mao3 = Jogar(janela, jogadores, Mao1, Mao2, Mao3, turno, message_queue, response_queue)
 
         # Adiciona as cartas das mãos ao baralho e limpa as mãos
         Baralhos[0]['cartas'].extend(Mao1)
@@ -846,7 +855,7 @@ def JogoPrincipal(janela, jogadores):
         Mao2.clear()
         Mao3.clear()
 
-        TelaVencedor(janela, jogador_vencedor, turno)
+        TelaVencedor(janela, jogador_vencedor, turno, message_queue, response_queue)
 
     # Determina o jogador com mais cartas e declara-o vencedor
     num_cartas = [len(baralho['cartas']) for baralho in Baralhos]
@@ -854,7 +863,7 @@ def JogoPrincipal(janela, jogadores):
     jogador_vencedor_final = jogadores[vencedor_index]
 
     # Tela de vencedor final
-    TelaVencedorFinal(janela, jogador_vencedor_final['nome'], jogadores[0], jogadores[1], jogadores[2])
+    TelaVencedorFinal(janela, jogador_vencedor_final['nome'], jogadores[0], jogadores[1], jogadores[2], message_queue, response_queue)
 
     pygame.quit()
     sys.exit()
