@@ -538,7 +538,6 @@ def download_files(client_socket, missing_indexes, amount, server_files, token):
                 except json.JSONDecodeError:
                     continue 
 
-            if not file_data_json:
                 print(f"[*] Empty Packet")
                 continue
 
