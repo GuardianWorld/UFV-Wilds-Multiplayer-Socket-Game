@@ -520,25 +520,39 @@ def download_files(client_socket, missing_indexes, amount, server_files, token):
     x = 0
     for index in missing_indexes:
         file = server_files[index]
-        
+
         package = json.dumps({"token": token, "message": "", "command": "download_images", "image_path": file[0]})
         client_socket.send(package.encode())
         print(f"[*] Requesting file: {file[0]} {x} / {amount}")
-        
-        file_data = client_socket.recv(1024 * 1024 * 5).decode() #5MB Buffer for downloading Images
-        file_data_json = json.loads(file_data)
-        
-        if(file_data_json == None):
-            print(f"[*] Empty Packet")
-            continue
-        if(file_data_json.get('command') == "file_download"):
-            path = os.getcwd() + "/StreamingAssets/" + file[0]
-            if(os.name == 'nt'):
-                path = path.replace("/", "\\")
-            imageb64 = file_data_json.get('imageb64')
-            b64_to_image(imageb64, path)
-            print(f"[*] File {path} downloaded.")
-            x += 1
+
+        try:
+            data = b""
+            while True:
+                part = client_socket.recv(8192) 
+                if not part:
+                    break
+                data += part
+                try:
+                    file_data_json = json.loads(data.decode())
+                    break
+                except json.JSONDecodeError:
+                    continue 
+
+            if not file_data_json:
+                print(f"[*] Empty Packet")
+                continue
+
+            if file_data_json.get('command') == "file_download":
+                path = os.path.join(os.getcwd(), "StreamingAssets", file[0])
+                if os.name == 'nt':
+                    path = path.replace("/", "\\")
+                imageb64 = file_data_json.get('imageb64')
+                b64_to_image(imageb64, path)
+                print(f"[*] File {path} downloaded.")
+                x += 1
+        except Exception as e:
+            print(f"[*] Download Exception: {str(e)}")
+            break
                     
 def verify_files(server_files):    
     missing_indexes = []
