@@ -84,6 +84,13 @@ def common_commands(message, token):
         send_status, json_message = delete_deck(message,token)
     elif(command == "check_deck"):
         send_status, json_message = check_deck(message, token)
+    elif(command == "msg"):
+        two_parts = message.split(' ', 2)
+        if(len(two_parts) != 3):
+            return False, {"token": token, "message": "Invalid input", "command": "error"}
+        receiver = two_parts[1]
+        message = two_parts[2]
+        json_message = {"token": token, "message": message, "command": "msg", "receiver": receiver}
     elif(command == "help"):
         help()
         send_status = False
@@ -292,6 +299,10 @@ def receive_message(client_socket):
                 print(f"[*] Remaining in deck: {cards}")
                 for card in hand:
                     print(f"[*] Card: {card[1]}")    
+            elif(command == "msg"):
+                sender = response_json.get('sender')
+                message = response_json.get('message')
+                print(f"[*] Message from {sender}: {message}")
             else:
                 print(f"[*] Message: {message}")    
         except KeyboardInterrupt:

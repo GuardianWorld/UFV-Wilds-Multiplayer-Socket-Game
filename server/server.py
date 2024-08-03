@@ -457,6 +457,7 @@ def handle_response(data, client_address, client_socket):
     if(command == "ping"):
         response = {"status": 200, "message": "pong", "command": "pong"}
     
+    
     if(command == "request_images"):
         #verify Token for safety
         user_id, status = database.validate_token(token)
@@ -504,7 +505,18 @@ def handle_response(data, client_address, client_socket):
         if(log_event_level >= 5):
             print(f"[*] Chat message received: {message}")
         response = {"status": 200, "message": message, "command": "chat"}
-        
+    
+    elif(command == "msg"):
+        receiver = data.get('receiver')
+        if(log_event_level >= 5):
+            print(f"[*] Message received: {message}")
+        response = {"status": 200, "message": message, "command": "msg", "sender": logged_users.get(client_address)}
+        for connection, user in logged_users.items():
+            if user == receiver:
+                receiver_socket = active_connections.get(connection)[0]
+                receiver_socket.send(json.dumps(response).encode())
+                break
+    
     elif(command == "register"):
         if(log_event_level >= 2):
             print(f"[*] Registration request received, User: {data.get('username')}")
