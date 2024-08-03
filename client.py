@@ -378,7 +378,7 @@ def start_client(host, port):
     
     if(receive_message_thread.is_alive()):
         receive_message_thread.join()
-    #alive_thread.join()
+
     close_connection(client_socket)
         
 # Aux Functions
