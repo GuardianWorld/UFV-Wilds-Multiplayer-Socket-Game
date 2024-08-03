@@ -352,6 +352,7 @@ def play_field(p1, p2, p3):
             
             if(first_player == None or second_player == None or third_player == None):
                 error = True
+                
                 break   
                 
             aux_player = first_player
@@ -372,9 +373,9 @@ def play_field(p1, p2, p3):
         print("[*] Match ended.")
         
     if(error):
-        send_error(first_player)
-        send_error(second_player)
-        send_error(third_player)
+        send_error(player1)
+        send_error(player2)
+        send_error(player3)
         match_rooms.remove((player1['name'],player2['name'], player3['name']))
         return
     
