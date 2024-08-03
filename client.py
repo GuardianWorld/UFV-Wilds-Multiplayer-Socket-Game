@@ -302,7 +302,7 @@ def receive_message(client_socket):
             elif(command == "msg"):
                 sender = response_json.get('sender')
                 message = response_json.get('message')
-                print(f"[*] Message from {sender}: {message}")
+                print(f"\n[*] Message from {sender}: {message}")
             else:
                 print(f"[*] Message: {message}")    
         except KeyboardInterrupt:
