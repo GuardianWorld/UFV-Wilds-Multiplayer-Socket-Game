@@ -500,14 +500,11 @@ def login_operation(client_socket):
     print(f"[*] Logging in...")
     print(f"[*] Loading... Please wait ")
     client_socket.send(json.dumps({"token": token, "message": "", "command": "request_images"}).encode())
-    data = b""
     while(True):
         response = client_socket.recv(4096)
         if not response:
             continue
-        
-        
-        
+        response = response.decode()
         response_json = json.loads(response)
         if(response_json == None):
             print(f"[*] Empty Packet")
