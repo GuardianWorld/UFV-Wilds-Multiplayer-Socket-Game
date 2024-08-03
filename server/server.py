@@ -402,7 +402,11 @@ def handle_client(client_socket, client_address):
     if not client_socket:
         return
     
+    forced_logoff_timer = 60
+    
     client_socket.settimeout(5.0)
+    
+    
     
     try:
         while not stop_event.is_set():
@@ -422,7 +426,11 @@ def handle_client(client_socket, client_address):
                 response_json = json.dumps(response)      
                           
                 client_socket.send(response_json.encode())
+                forced_logoff_timer = 60
             except socket.timeout:
+                forced_logoff_timer -= 1
+                if(forced_logoff_timer <= 0):
+                    client_socket.send(json.dumps({"status": 200, "message": "Inactivity", "command": "serverside_logoff"}).encode())
                 continue
     except Exception as e:
         print(f"Error: {e}")

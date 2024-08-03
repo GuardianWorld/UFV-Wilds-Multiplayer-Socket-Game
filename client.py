@@ -115,7 +115,7 @@ def receive_message(client_socket):
             
             elif(command == "logoff"):
                 print(f"[*] Turning off")
-                sleep(0.2)
+                sleep(0.5)
                 stop_event.set()
                 return
             
@@ -123,7 +123,7 @@ def receive_message(client_socket):
                 reason = response_json.get('message')
                 print(f"[*] You have been disconnected from the server.")
                 print(f"[*] Reason: {reason}")
-                sleep(0.2)
+                sleep(1)
                 stop_event.set()
                 return
             
