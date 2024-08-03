@@ -307,7 +307,7 @@ def client_handler(client_socket):
     global login_into_server
     global on_match
     
-    debug_auto(client_socket)
+    #debug_auto(client_socket)
     
     try:        
         while not stop_event.is_set():
