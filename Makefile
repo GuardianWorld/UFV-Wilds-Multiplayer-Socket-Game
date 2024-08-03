@@ -24,6 +24,3 @@ server_install: install
 
 client_install: install
 	$(PYTHON) client.py
-	
-client_host: 
-	$(PYTHON) client.py ufvwilds.mixxy.playit.gg 50125

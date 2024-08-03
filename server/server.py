@@ -410,12 +410,13 @@ def handle_client(client_socket, client_address):
     active_connections[client_address] = (client_socket, datetime.datetime.utcnow())
     if not client_socket:
         return
-    
-    forced_logoff_timer = 60
-    
+
     client_socket.settimeout(5.0)
     
-    
+    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
+    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 3)
+    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
     
     try:
         while not stop_event.is_set():
@@ -433,12 +434,7 @@ def handle_client(client_socket, client_address):
                 response_json = json.dumps(response)      
                           
                 client_socket.send(response_json.encode())
-                forced_logoff_timer = 60
             except socket.timeout:
-                client_socket.send(json.dumps({"status": 200, "message": "", "command": "ping"}).encode())
-                forced_logoff_timer -= 1
-                if(forced_logoff_timer <= 0):
-                    client_socket.send(json.dumps({"status": 200, "message": "Inactivity", "command": "serverside_logoff"}).encode())
                 continue
     except Exception as e:
         print(f"Error: {e}")

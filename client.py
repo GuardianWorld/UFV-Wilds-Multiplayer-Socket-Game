@@ -325,7 +325,10 @@ def client_handler(client_socket):
     global username
     global login_into_server
     global on_match
-    
+    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
+    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 3)
+    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
     try:        
         while not stop_event.is_set():
             if not login_into_server:
