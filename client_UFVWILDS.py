@@ -133,10 +133,23 @@ def receive_message(client_socket):
     global on_match
     global login_into_server
     
+    response_json = {}
+    data = b""
     while not stop_event.is_set():
         try:
-            response = client_socket.recv(4096).decode()
-            response_json = json.loads(response)
+            response = client_socket.recv(4096)
+            if not response:
+                continue
+
+            data += response
+            try:
+                response_json = json.loads(data.decode())
+            except json.JSONDecodeError:
+                continue
+            
+            data = b""
+            
+            #response_json = json.loads(response)
             if(response_json == None):
                 print(f"[*] Empty Packet")
                 continue
@@ -290,15 +303,6 @@ def receive_message(client_socket):
             sleep(4)
             stop_event.set()
             return
-        
-def match_handler(client_socket):
-    global on_match
-    global on_turn
-    while not stop_event.is_set() and on_match:
-        #if(on_turn):
-            
-        #else:
-            pass
 
 def client_handler(client_socket):
     global stop_event
@@ -334,6 +338,12 @@ def client_handler(client_socket):
     except Exception as e:
         print(f"[*] Sender Exception: {str(e)}")
         return            
+
+def match_handler(client_socket):
+    global on_match
+    global on_turn
+    while not stop_event.is_set() and on_match:
+        pass 
     
 #Start Client
 def start_client(host, port):
@@ -368,7 +378,7 @@ def start_client(host, port):
     
     if(receive_message_thread.is_alive()):
         receive_message_thread.join()
-    #alive_thread.join()
+
     close_connection(client_socket)
         
 # Aux Functions
@@ -491,7 +501,10 @@ def login_operation(client_socket):
     print(f"[*] Loading... Please wait ")
     client_socket.send(json.dumps({"token": token, "message": "", "command": "request_images"}).encode())
     while(True):
-        response = client_socket.recv(4096).decode()
+        response = client_socket.recv(4096)
+        if not response:
+            continue
+        response = response.decode()
         response_json = json.loads(response)
         if(response_json == None):
             print(f"[*] Empty Packet")
@@ -537,10 +550,6 @@ def download_files(client_socket, missing_indexes, amount, server_files, token):
                     break
                 except json.JSONDecodeError:
                     continue 
-
-                print(f"[*] Empty Packet")
-                continue
-
             if file_data_json.get('command') == "file_download":
                 path = os.path.join(os.getcwd(), "StreamingAssets", file[0])
                 if os.name == 'nt':
