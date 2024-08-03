@@ -173,6 +173,7 @@ def receive_message(client_socket):
                 token = response_json.get('token')
                 username = response_json.get('username')
                 login_operation(client_socket)
+                
             
             elif(command == "logoff"):
                 print(f"[*] Turning off")
@@ -304,7 +305,8 @@ def receive_message(client_socket):
             elif(command == "msg"):                    
                 sender = response_json.get('sender')
                 message = response_json.get('message')
-                print(f"\n[*] Message from {sender}: {message}")
+                if(sender != username):
+                    print(f"\n[*] Message from {sender}: {message}")
             else:
                 print(f"[*] Message: {message}")    
         except KeyboardInterrupt:
@@ -534,6 +536,7 @@ def login_operation(client_socket):
                 print(f"[*] Missing {amount} files.")
                 sleep(2)
                 download_files(client_socket, missing_indexes, amount, server_files, token)
+                client_socket.send(json.dumps({"token": token, "message": "", "command": "login_finish"}).encode())
                 break
         else:
             print(f"[*] Unknown command: {command} {response_json.get('message')}")

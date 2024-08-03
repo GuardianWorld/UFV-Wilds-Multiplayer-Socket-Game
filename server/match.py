@@ -85,9 +85,11 @@ def get_attribute(socket):
                     socket.send(json.dumps({"status": 400, "message": "Invalid attribute", "command": "error"}).encode())
             else:
                 socket.send(json.dumps({"status": 400, "message": "Invalid command", "command": "error"}).encode())
+        except socket.timeout:
+            continue
         except Exception as e:
             print(str(e))
-            break
+            return None
 
 def get_played_card(player, attribute):
     card_hand = []
@@ -95,7 +97,11 @@ def get_played_card(player, attribute):
         card = database.get_card_by_id(card_id)
         card_value = database.get_card_attribute(card_id, attribute)
         card_hand.append((card, card_value))
-    player['socket'].send(json.dumps({"status": 200, "message": "Select a card", "command": "select_card", "hand": card_hand, "attribute": attribute}).encode())
+    try:
+        player['socket'].send(json.dumps({"status": 200, "message": "Select a card", "command": "select_card", "hand": card_hand, "attribute": attribute}).encode())
+    except Exception as e:
+        print(str(e))
+        return None, None
     while True:
         try:
             request = player['socket'].recv(4096)
@@ -120,9 +126,11 @@ def get_played_card(player, attribute):
                 player['socket'].send(json.dumps(response).encode())
             else:
                 player['socket'].send(json.dumps({"status": 400, "message": "Invalid command", "command": "error"}).encode())
+        except socket.timeout:
+            continue
         except Exception as e:
             print(str(e))
-            break
+            return None, None
     return card, player['name']
 
 def attribute_to_int(value, attribute):
@@ -157,6 +165,7 @@ def show_hand(player):
     
     cards_in_deck = len(player['cards'])
     player['socket'].send(json.dumps({"status": 200, "message": "Select a card", "command": "card_hand", "hand": card_hand, "cards": cards_in_deck}).encode())
+    
     return
 
 def normal_attributes_fight(p1, p2, p3, attribute):
@@ -239,9 +248,17 @@ def turn(first_player, second_player, third_player):
     show_hand(third_player)
     
     attribute = get_attribute(first_player['socket'])
+    if(attribute == None):
+        return None, None, None
     p1_card, p1_name = get_played_card(first_player, attribute)
+    if(p1_card == None):
+        return None, None, None
     p2_card, p2_name = get_played_card(second_player, attribute)
+    if(p2_card == None):
+        return None, None, None
     p3_card, p3_name = get_played_card(third_player, attribute)
+    if(p3_card == None):
+        return None, None, None
     
     winner_player = determine_winner([first_player['name'],p1_card[0]], [second_player['name'], p2_card[0]], [third_player['name'], p3_card[0]], attribute)
     # Remove cards from everyone hand
@@ -320,9 +337,9 @@ def play_field(p1, p2, p3):
     
     #Grab a random card from ALL three players cards and set as a reward
         #removes the timeout attribute for now
-    first_player['socket'].settimeout(None)
-    second_player['socket'].settimeout(None)
-    third_player['socket'].settimeout(None)
+    #first_player['socket'].settimeout(None)
+    #second_player['socket'].settimeout(None)
+    #third_player['socket'].settimeout(None)
     
     should_end = False
     
@@ -331,7 +348,11 @@ def play_field(p1, p2, p3):
     while not stop_event.is_set() and not should_end:
         try:
             time.sleep(0.5)
-            first_player, second_player, third_player = turn(first_player, second_player, third_player)            
+            first_player, second_player, third_player = turn(first_player, second_player, third_player)         
+            
+            if(first_player == None or second_player == None or third_player == None):
+                error = True
+                break   
                 
             aux_player = first_player
             first_player = second_player

@@ -24,7 +24,7 @@ def signal_handler(sig, frame):
     print(f"[*] Signal received: {sig}. Shutting down...")
     shutdown_server(5)
 
-signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)    
 
 #Start Server
 def start_server(host, port):
@@ -387,6 +387,15 @@ def terminal_kick():
             client_socket = (active_connections[client_address])[0]
             
             client_socket.send(json.dumps({"status": 200, "message": reason, "command": "serverside_logoff"}).encode())
+            #remove from connections
+            client_socket.close()
+            del active_connections[client_address]
+            #delete from logged users
+            del logged_users[client_address]
+            print(f"[*] User {username} kicked.")
+            #del from match search
+            if(match.player_searching(username)):
+                del searching_for_match[username]
             return
     
 
@@ -426,6 +435,7 @@ def handle_client(client_socket, client_address):
                 client_socket.send(response_json.encode())
                 forced_logoff_timer = 60
             except socket.timeout:
+                client_socket.send(json.dumps({"status": 200, "message": "", "command": "ping"}).encode())
                 forced_logoff_timer -= 1
                 if(forced_logoff_timer <= 0):
                     client_socket.send(json.dumps({"status": 200, "message": "Inactivity", "command": "serverside_logoff"}).encode())
@@ -531,6 +541,10 @@ def handle_response(data, client_address, client_socket):
         response = login(data.get('username'), data.get('password'), client_address)
         if(response['status'] == 200):
             print(f"[*] User {data.get('username')} logged in.")
+        client_socket.settimeout(300.0)
+        
+    elif(command == "login_finish"):
+        client_socket.settimeout(5.0)
         
     elif(command == "check_cards"):
         user_id = database.get_user_id(logged_users.get(client_address))[0]
@@ -663,6 +677,9 @@ def login(username, password, client_address):
     if(check_online_user(username)):
         return {"status": 500, "message": "User already logged in", "command": "error"}
     response = database.login_user(username, password)
+    
+    if(response['status'] != 200):
+        return response
     if(response['status'] == 200):
         logged_users[client_address] = username
     
