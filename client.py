@@ -146,7 +146,7 @@ def receive_message(client_socket):
     data = b""
     while not stop_event.is_set():
         try:
-            response = client_socket.recv(4096)
+            response = client_socket.recv(8192)
             if not response:
                 continue
 
@@ -329,6 +329,8 @@ def client_handler(client_socket):
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 3)
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
+    
+    print(f"[*] Connected to {host}:{port}")  
     try:        
         while not stop_event.is_set():
             if not login_into_server:
@@ -371,10 +373,7 @@ def start_client(host, port):
     except ConnectionRefusedError:
         print(f"[*] Connection refused to {host}:{port}")
         sleep(2)
-        return
-    print(f"[*] Connected to {host}:{port}")   
-
-    
+        return    
 
     client_handler_tread = threading.Thread(target=client_handler, args=(client_socket,))
     client_handler_tread.start()
@@ -517,7 +516,7 @@ def login_operation(client_socket):
     print(f"[*] Loading... Please wait ")
     client_socket.send(json.dumps({"token": token, "message": "", "command": "request_images"}).encode())
     while(True):
-        response = client_socket.recv(4096)
+        response = client_socket.recv(8192)
         if not response:
             continue
         response = response.decode()

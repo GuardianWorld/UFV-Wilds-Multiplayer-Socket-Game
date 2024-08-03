@@ -14,7 +14,7 @@ import os
 
 
 import database
-from config import active_connections, stop_event, logged_users, searching_for_match, match_rooms, log_event_level
+from config import active_connections, stop_event, logged_users, searching_for_match, match_rooms, log_event_level, delay_for_lag
 import match
 
 files = []
@@ -426,7 +426,7 @@ def handle_client(client_socket, client_address):
                         time.sleep(1)
                         continue
                         
-                request = client_socket.recv(4096)
+                request = client_socket.recv(8192)
                 if not request:
                     break
                 data = json.loads(request.decode())
@@ -478,7 +478,7 @@ def handle_response(data, client_address, client_socket):
             response_json = json.dumps({"status": 200, "message": "images", "command": "request_images", "image": image_path, "checksum": checksum})
             client_socket.send(response_json.encode())
             #confirm the image was sent
-            confirm = client_socket.recv(2048).decode()
+            confirm = client_socket.recv(8192).decode()
             confirm = json.loads(confirm)
             if(confirm.get('command') == "image_received"):
                 continue
@@ -877,11 +877,13 @@ if __name__ == "__main__":
     parser.add_argument("-H", "--host", default="localhost", help="The host to bind the server to. Default is connection to LocalHost")
     parser.add_argument("-p", "--port", type=int, default=25555, help="The port to bind the server to. Default is 25555.")
     parser.add_argument("-l", "--log", type=int, default=4, help="The log event level. Default is 4 (Player Logins + Register + Matches + Connections). Maximum is 5.")
+    parser.add_argument("-dl", "--delay", type=float, default=0.1, help="The delay between socket messages. Default is 0.1 seconds.")
     
     args = parser.parse_args()
     
     host = args.host
     port = args.port
     log_event_level = args.log
+    delay_for_lag = args.delay
     
     start_server(host, port)

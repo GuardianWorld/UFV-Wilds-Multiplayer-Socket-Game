@@ -7,7 +7,7 @@ import time
 import signal
 import database
 
-from config import active_connections, logged_users, stop_event, searching_for_match, match_rooms, log_event_level
+from config import active_connections, logged_users, stop_event, searching_for_match, match_rooms, log_event_level, delay_for_lag
 
 def search_match():
     print("[*] Matchmaking Server Started.")
@@ -70,11 +70,11 @@ def players_info(p1,p2,p3):
     
     return player1, player2, player3
 
-def get_attribute(socket):
-    socket.send(json.dumps({"status": 200, "message": "Select an attribute", "command": "select_attribute"}).encode())
+def get_attribute(player):
+    send_message(player, json.dumps({"status": 200, "message": "Select an attribute", "command": "select_attribute"}).encode())
     while True:
         try:
-            request = socket.recv(4096)
+            request = player['socket'].recv(8192)
             data = json.loads(request.decode())
             command = data.get('command')
             if(command == "select_attribute"):
@@ -82,9 +82,9 @@ def get_attribute(socket):
                 if(attribute == "Forca" or attribute == "Fofura" or attribute == "Velocidade" or attribute == "Tamanho" or attribute == "Idade" or attribute == "Tipo"):
                     return attribute
                 else:
-                    socket.send(json.dumps({"status": 400, "message": "Invalid attribute", "command": "error"}).encode())
+                    send_message(player, json.dumps({"status": 400, "message": "Invalid attribute", "command": "error"}).encode())
             else:
-                socket.send(json.dumps({"status": 400, "message": "Invalid command", "command": "error"}).encode())
+                send_message(player, json.dumps({"status": 400, "message": "Invalid command", "command": "error"}).encode())
         except socket.timeout:
             continue
         except Exception as e:
@@ -98,13 +98,14 @@ def get_played_card(player, attribute):
         card_value = database.get_card_attribute(card_id, attribute)
         card_hand.append((card, card_value))
     try:
-        player['socket'].send(json.dumps({"status": 200, "message": "Select a card", "command": "select_card", "hand": card_hand, "attribute": attribute}).encode())
+        send_message(player, json.dumps({"status": 200, "message": "Select a card", "command": "select_card", "hand": card_hand, "attribute": attribute}).encode())
     except Exception as e:
         print(str(e))
         return None, None
+    
     while True:
         try:
-            request = player['socket'].recv(4096)
+            request = player['socket'].recv(8192)
             data = json.loads(request.decode())
             command = data.get('command')
             if(command == "select_card"):
@@ -112,20 +113,20 @@ def get_played_card(player, attribute):
                 try:
                     card_id = database.get_card_id(card_name)[0]
                 except:
-                    player['socket'].send(json.dumps({"status": 400, "message": "Invalid card", "command": "error"}).encode())
+                    send_message(player, json.dumps({"status": 400, "message": "Invalid card", "command": "error"}).encode())
                     continue
                 
                 if(card_id in player['hand']):
                     card = database.get_card_by_id(card_id)
                     break
                 else:
-                    player['socket'].send(json.dumps({"status": 400, "message": "Invalid card", "command": "error"}).encode())
+                    send_message(player, json.dumps({"status": 400, "message": "Invalid card", "command": "error"}).encode())
             elif(command == "check_card"):
                 card_name = data.get('card')
                 response = database.get_card_info(data.get('card_name'))
-                player['socket'].send(json.dumps(response).encode())
+                send_message(player, json.dumps(response).encode()) 
             else:
-                player['socket'].send(json.dumps({"status": 400, "message": "Invalid command", "command": "error"}).encode())
+                send_message(player, json.dumps({"status": 400, "message": "Invalid command", "command": "error"}).encode())
         except socket.timeout:
             continue
         except Exception as e:
@@ -164,8 +165,7 @@ def show_hand(player):
         card_hand.append(card)
     
     cards_in_deck = len(player['cards'])
-    player['socket'].send(json.dumps({"status": 200, "message": "Select a card", "command": "card_hand", "hand": card_hand, "cards": cards_in_deck}).encode())
-    
+    send_message(player, json.dumps({"status": 200, "message": "Select a card", "command": "card_hand", "hand": card_hand, "cards": cards_in_deck}).encode())
     return
 
 def normal_attributes_fight(p1, p2, p3, attribute):
@@ -230,24 +230,24 @@ def winTurn(p1_card, p2_card, p3_card, win_player, second_player, third_player):
     win_player['cards'].append(p1_card[0])
     win_player['cards'].append(p2_card[0])
     win_player['cards'].append(p3_card[0])
-    win_player['socket'].send(json.dumps({"status": 200, "message": "You won this turn!", "command": "turn_end", "winner": p1_name}).encode())
-    second_player['socket'].send(json.dumps({"status": 200, "message": "You lost this turn!", "command": "turn_end", "winner": p1_name,}).encode())
-    third_player['socket'].send(json.dumps({"status": 200, "message": "You lost this turn!", "command": "turn_end", "winner": p1_name,}).encode())
+    send_message(win_player, json.dumps({"status": 200, "message": "You won this turn!", "command": "turn_end", "winner": p1_name}).encode())
+    send_message(second_player, json.dumps({"status": 200, "message": "You lost this turn!", "command": "turn_end", "winner": p1_name}).encode())
+    send_message(third_player, json.dumps({"status": 200, "message": "You lost this turn!", "command": "turn_end", "winner": p1_name}).encode())
     
     return win_player
     
 
 def turn(first_player, second_player, third_player):    
     
-    first_player['socket'].send(json.dumps({"status": 200, "message": "Your turn", "command": "your_turn", "hand": first_player['hand']}).encode())
-    second_player['socket'].send(json.dumps({"status": 200, "message": f"{first_player['name']} turn", "command": "opponent_turn", "hand": second_player['hand']}).encode())
-    third_player['socket'].send(json.dumps({"status": 200, "message": f"{first_player['name']} turn", "command": "opponent_turn", "hand": third_player['hand']}).encode())
+    send_message(first_player, json.dumps({"status": 200, "message": "Your turn", "command": "your_turn", "hand": first_player['hand']}).encode())
+    send_message(second_player, json.dumps({"status": 200, "message": f"{first_player['name']} turn", "command": "opponent_turn", "hand": second_player['hand']}).encode())
+    send_message(third_player, json.dumps({"status": 200, "message": f"{first_player['name']} turn", "command": "opponent_turn", "hand": third_player['hand']}).encode())
     
     show_hand(first_player)
     show_hand(second_player)
     show_hand(third_player)
     
-    attribute = get_attribute(first_player['socket'])
+    attribute = get_attribute(first_player)
     if(attribute == None):
         return None, None, None
     p1_card, p1_name = get_played_card(first_player, attribute)
@@ -322,6 +322,17 @@ def send_error(p1):
     except:
         pass
 
+def send_message(player, encoded_message):
+    try:
+        socket = player['socket']
+        if(socket == None):
+            socket = player
+        socket.send(encoded_message)
+    except:
+        return False
+    time.sleep(delay_for_lag)
+    return True
+
 def play_field(p1, p2, p3): 
     
     player1, player2, player3 = players_info(p1,p2,p3)
@@ -330,16 +341,9 @@ def play_field(p1, p2, p3):
     if(log_event_level >= 4):
         print(f"[*] Match started between {player1['name']}, {player2['name']} and {player3['name']}")
     
-    player1['socket'].send(json.dumps({"status": 200, "message": "match", "command": "match_start", "player_1": player1['name'], "player_2": player2['name'], "player_3": player3['name']}).encode())
-    player2['socket'].send(json.dumps({"status": 200, "message": "match", "command": "match_start", "player_1": player1['name'], "player_2": player2['name'], "player_3": player3['name']}).encode())
-    player3['socket'].send(json.dumps({"status": 200, "message": "match", "command": "match_start", "player_1": player1['name'], "player_2": player2['name'], "player_3": player3['name']}).encode())
-    time.sleep(0.2)
-    
-    #Grab a random card from ALL three players cards and set as a reward
-        #removes the timeout attribute for now
-    #first_player['socket'].settimeout(None)
-    #second_player['socket'].settimeout(None)
-    #third_player['socket'].settimeout(None)
+    send_message(player1, json.dumps({"status": 200, "message": "match", "command": "match_start", "player_1": player1['name'], "player_2": player2['name'], "player_3": player3['name']}).encode())
+    send_message(player2, json.dumps({"status": 200, "message": "match", "command": "match_start", "player_1": player1['name'], "player_2": player2['name'], "player_3": player3['name']}).encode())
+    send_message(player3, json.dumps({"status": 200, "message": "match", "command": "match_start", "player_1": player1['name'], "player_2": player2['name'], "player_3": player3['name']}).encode())
     
     should_end = False
     
@@ -381,14 +385,12 @@ def play_field(p1, p2, p3):
     
     winner_player, l1, l2 = check_winner(first_player, second_player, third_player)
     
-    winner_player['socket'].send(json.dumps({"status": 200, "message": "You won!", "command": "match_end"}).encode())
-    l1['socket'].send(json.dumps({"status": 200, "message": "You lost!", "command": "match_end"}).encode())
-    l2['socket'].send(json.dumps({"status": 200, "message": "You lost!", "command": "match_end"}).encode())
-    
+    send_message(winner_player, json.dumps({"status": 200, "message": "You won!", "command": "match_end"}).encode())
+    send_message(l1, json.dumps({"status": 200, "message": "You lost!", "command": "match_end"}).encode())
+    send_message(l2, json.dumps({"status": 200, "message": "You lost!", "command": "match_end"}).encode())
+
     full_deck = l1['cards'] + l2['cards']
     reward_card = None
-    
-    
     
     while True:
         try:
@@ -404,10 +406,10 @@ def play_field(p1, p2, p3):
             if amount < 3:
                 database.add_card_to_user(winner_player['id'], reward_card)
                 reward_card_name = database.get_card_by_id(reward_card)[1]
-                winner_player['socket'].send(json.dumps({"status": 200, "message": "You won a card!", "command": "reward", "card": reward_card_name}).encode())
+                send_message(winner_player, json.dumps({"status": 200, "message": "You won a card!", "command": "reward", "card": reward_card_name}).encode())
                 break
             if len(full_deck) == 0:
-                winner_player['socket'].send(json.dumps({"status": 200, "message": "You won a card!", "command": "reward", "card": "You have all cards on the reward table"}).encode())
+                send_message(winner_player, json.dumps({"status": 200, "message": "You won a card!", "command": "reward", "card": "You have all cards on the reward table"}).encode())
                 break
         except Exception as e:
             print(str(e))
