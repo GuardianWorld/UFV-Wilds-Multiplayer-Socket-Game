@@ -507,6 +507,9 @@ def handle_response(data, client_address, client_socket):
         response = {"status": 200, "message": message, "command": "chat"}
     
     elif(command == "msg"):
+        if(token == None):
+            return {"status": 401, "message": "Invalid Token", "command": "error"}
+        
         receiver = data.get('receiver')
         if(log_event_level >= 5):
             print(f"[*] Message received: {message}")

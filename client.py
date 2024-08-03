@@ -85,6 +85,8 @@ def common_commands(message, token):
     elif(command == "check_deck"):
         send_status, json_message = check_deck(message, token)
     elif(command == "msg"):
+        if not token:
+            return False, {"token": token, "message": "Not logged in", "command": "error"}
         two_parts = message.split(' ', 2)
         if(len(two_parts) != 3):
             return False, {"token": token, "message": "Invalid input", "command": "error"}
@@ -299,7 +301,7 @@ def receive_message(client_socket):
                 print(f"[*] Remaining in deck: {cards}")
                 for card in hand:
                     print(f"[*] Card: {card[1]}")    
-            elif(command == "msg"):
+            elif(command == "msg"):                    
                 sender = response_json.get('sender')
                 message = response_json.get('message')
                 print(f"\n[*] Message from {sender}: {message}")
@@ -321,8 +323,6 @@ def client_handler(client_socket):
     global username
     global login_into_server
     global on_match
-    
-    #debug_auto(client_socket)
     
     try:        
         while not stop_event.is_set():
@@ -630,8 +630,6 @@ def list_files(directory):
         if os.path.isfile(file_path):
             files.append(item)
     return files
-            
-
 
 def offline_commands():
     while True:
@@ -640,19 +638,6 @@ def offline_commands():
             return False
         if(offline_command == "start"):
             return True
-
-def debug_auto(client_socket):
-    global token
-    message = ["login mixxs 123456", "login marcus 123456", "login alan 123456", "match_search"]
-    
-    for m in message:
-        send_status, packed_message = package_message(m, token)
-        if(not send_status):
-            continue
-        print(f"[*] Sending: {m}")
-        package = json.dumps(packed_message)
-        client_socket.send(package.encode())
-        sleep(0.25)
 
 if __name__ == "__main__":
     host = "localhost"

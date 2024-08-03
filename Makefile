@@ -20,7 +20,10 @@ client:
 	$(PYTHON) client.py
 
 server_install: install
-	$(PYTHON) server.py
+	$(PYTHON) server/server.py
 
 client_install: install
 	$(PYTHON) client.py
+	
+client_host: 
+	$(PYTHON) client.py ufvwilds.mixxy.playit.gg 50125
