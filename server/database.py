@@ -318,8 +318,16 @@ def get_card_id(name):
 def get_card_by_name(name):
     return simple_command_fetchone('''SELECT * FROM card WHERE card_name = ?''', (name,))
 
+
 def get_card_by_id(id): 
     return simple_command_fetchone('''SELECT * FROM card WHERE id = ?''', (id,))
+
+def get_card_name_by_id(id):
+    return simple_command_fetchone('''SELECT card_name FROM card WHERE id = ?''', (id,))
+
+def get_card_attribute(card_id, attribute):
+    attribute = attribute.lower()
+    return simple_command_fetchone(f'''SELECT {attribute} FROM card WHERE id = ?''', (card_id,))
 
 def get_card_amount(token, card_id):
     try:
@@ -331,7 +339,9 @@ def get_card_amount(token, card_id):
         return card_amount[0]
     except:
         return 0
-    
+
+def get_card_amount_userID(user_id, card_id):
+    return simple_command_fetchone('''SELECT amount FROM user_cards WHERE user_id = ? AND card_id = ?''', (user_id, card_id))
 
 def get_card_info(card_name):
     try:
@@ -510,6 +520,12 @@ def get_deck_id_by_name(deck_name, user_id):
     deck = c.execute('''SELECT id FROM decks WHERE deck_name = ? AND user_id = ?''', (deck_name, user_id)).fetchone()
     conn.close()
     return deck
+
+def get_cards_in_deck(deck_id):
+    conn, c = get_db_connection()
+    cards = c.execute('''SELECT card_id FROM deck_cards WHERE deck_id = ?''', (deck_id,)).fetchall()
+    conn.close()
+    return cards
 
 def get_deck_info(token, deck_id):
     try:

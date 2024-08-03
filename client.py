@@ -15,6 +15,7 @@ username = ""
 login_into_server = False
 searching_for_match = False
 on_match = False
+on_turn = False
 downloading_file = False
 
 
@@ -22,49 +23,87 @@ def close_connection(client_socket):
     print("[*] Disconnected from server.")
     client_socket.close()
     
-def package_message(message, token="none"):
-    global searching_for_match
+def match_commands(message, token):
     full_message = message.split(' ', 1)
     command = full_message[0]
     json_message = {}
     send_status = True
+    if(command == "select_attribute"):
+        attribute = full_message[1]
+        json_message = {"token": token, "message": "", "command": "select_attribute", "attribute": attribute}
+    if(command == "select_card"):
+        card_name = full_message[1]
+        json_message = {"token": token, "message": "", "command": "select_card", "card_name": card_name}
+    if(command == "forfeit"):
+        json_message = {"token": token, "message": "", "command": "forfeit"}
+    if(command == "check_card"):
+        card_name = full_message[1]
+        json_message = {"token": token, "message": "", "command": "check_card", "card_name": card_name}
+    if(command == "help"):
+        print("Commands: ")
+        print("select_attribute <attribute>: Select an attribute to play")
+        print("select_card <card>: Select a card to play")
+        print("forfeit: Forfeit the match")
+        print("check_card <card_name>: Check a specific card")
+        send_status = False
+        json_message = {"token": token, "message": "", "command": "chat"}
+        
+    return send_status, json_message
+    
+def common_commands(message, token):
+    full_message = message.split(' ', 1)
+    command = full_message[0]
+    json_message = {}
+    send_status = True
+    
+    if(command == "exit"):
+        json_message = {"token": token, "message": "", "command": "logoff"}
+    elif(command == "register"):
+        send_status, json_message = register(message, token)
+    elif(command == "login"):
+        send_status, json_message = login(message, token)
+    elif(command == "match_search"):
+        send_status, json_message = match_search(token)           
+    elif(command == "check_cards"):
+        json_message = {"token": token, "message": "", "command": "check_cards"}
+    elif(command == "check_card"):
+        card_name = full_message[1]
+        json_message = {"token": token, "message": "", "command": "check_card", "card_name": card_name}
+    elif(command == "activate_deck"):
+        deck_name = full_message[1]
+        json_message = {"token": token, "message": "", "command": "activate_deck", "deck_name": deck_name}
+    elif(command == "check_decks"):
+        send_status, json_message = check_decks(token)
+    elif(command == "add_card_to_deck"):
+        send_status, json_message = add_card_to_deck(message, token)
+    elif(command == "remove_card_from_deck"):
+        send_status, json_message = remove_card_from_deck(message, token)
+    elif(command == "create_deck"):
+        send_status, json_message = create_deck(message, token)
+    elif(command == "delete_deck"):
+        send_status, json_message = delete_deck(message,token)
+    elif(command == "check_deck"):
+        send_status, json_message = check_deck(message, token)
+    elif(command == "help"):
+        help()
+        send_status = False
+        json_message = {"token": token, "message": "", "command": "chat"}
+    else:
+        json_message = {"token": token, "message": message, "command": "chat"}
+    
+    return send_status, json_message
+
+def package_message(message, token="none"):
+    global searching_for_match
+    global on_match
+    json_message = {}
+    send_status = True
 
     try:
-        if(command == "exit"):
-            json_message = {"token": token, "message": "", "command": "logoff"}
-        elif(command == "register"):
-            send_status, json_message = register(message, token)
-        elif(command == "login"):
-            send_status, json_message = login(message, token)
-        elif(command == "match_search"):
-            send_status, json_message = match_search(token)           
-        elif(command == "check_cards"):
-            json_message = {"token": token, "message": "", "command": "check_cards"}
-        elif(command == "check_card"):
-            card_name = full_message[1]
-            json_message = {"token": token, "message": "", "command": "check_card", "card_name": card_name}
-        elif(command == "activate_deck"):
-            deck_name = full_message[1]
-            json_message = {"token": token, "message": "", "command": "activate_deck", "deck_name": deck_name}
-        elif(command == "check_decks"):
-            send_status, json_message = check_decks(token)
-        elif(command == "add_card_to_deck"):
-            send_status, json_message = add_card_to_deck(message, token)
-        elif(command == "remove_card_from_deck"):
-            send_status, json_message = remove_card_from_deck(message, token)
-        elif(command == "create_deck"):
-            send_status, json_message = create_deck(message, token)
-        elif(command == "delete_deck"):
-            send_status, json_message = delete_deck(message,token)
-        elif(command == "check_deck"):
-            send_status, json_message = check_deck(message, token)
-        elif(command == "help"):
-            help()
-            send_status = False
-            json_message = {"token": token, "message": "", "command": "chat"}
+        if(on_match):
+            send_status, json_message = match_commands(message, token)
         else:
-            json_message = {"token": token, "message": message, "command": "chat"}
-        
+            send_status, json_message = common_commands(message, token)
     except Exception as e:
                 json_message = {"token": token, "message": f"Error: {str(e)}", "command": "error"}
                 send_status = False
@@ -196,17 +235,50 @@ def receive_message(client_socket):
                 deck_name = response_json.get('deck_name')
                 print(f"[*] Card {card_name} removed from deck {deck_name}")
                 
+            #Match Commands    
             elif(command == "match_start"):
                 player_1 = response_json.get('player_1')
                 player_2 = response_json.get('player_2')
                 player_3 = response_json.get('player_3')
+                print("\n")
                 print(f"[*] Match started between {player_1}, {player_2} and {player_3}")
                 on_match = True
             elif(command == "match_end"):
                 on_match = False
                 print(f"[*] Match ended.")
+                print(f"[*] {message}")
             elif(command == "error"):
                 print(f"[*] Error: {message}")
+            elif(command == "select_attribute"):
+                print(f"[*] Select a attribute")
+                print(f"[*] Attributes: Forca, Fofura, Velocidade, Tamanho, Idade, Tipo")
+            elif(command == "select_card"):
+                attribute_in_play = response_json.get('attribute')
+                hand = response_json.get('hand')
+                print(f"[*] Select a card")
+                print(f"[*] Attribute in play: {attribute_in_play}")
+                x = 0
+                for card, card_value in hand:
+                    print(f"[*] Card: {card[1]} Value: {card_value}")
+                    x += 1
+            elif(command == "your_turn"):
+                print(f"[*] Your turn")
+            elif(command == "opponent_turn"):
+                print(f"[*] Opponent turn")
+            elif(command == "turn_end"):
+                winner = response_json.get('winner')
+                print(f"[*] Turn ended")
+                print(f"[*] Winner: {winner}")
+                print(f"[*] {message}")
+                
+            elif(command == "reward"):
+                print(f"[*] Reward: {response_json.get('card')}")      
+            elif(command == "card_hand"):
+                hand = response_json.get('hand')  
+                cards = response_json.get('cards')
+                print(f"[*] Remaining in deck: {cards}")
+                for card in hand:
+                    print(f"[*] Card: {card[1]}")    
             else:
                 print(f"[*] Message: {message}")    
         except KeyboardInterrupt:
@@ -219,107 +291,31 @@ def receive_message(client_socket):
             stop_event.set()
             return
         
-def login_operation(client_socket):
-    global login_into_server 
-    global token
-    server_files = []
-    x = 0
-    
-    login_into_server= True
-    
-    print(f"[*] Logging in...")
-    print(f"[*] Loading... Please wait ")
-    client_socket.send(json.dumps({"token": token, "message": "", "command": "request_images"}).encode())
-    while(True):
-        response = client_socket.recv(4096).decode()
-        response_json = json.loads(response)
-        if(response_json == None):
-            print(f"[*] Empty Packet")
-            continue
-        command = response_json.get('command')
-        if(command == "request_images"):
-            server_files.append((response_json.get('image'), response_json.get('checksum')))
-            client_socket.send(json.dumps({"token": token, "message": "", "command": "image_received"}).encode())
-        elif(command == "request_images_end"):
-            print(f"[*] There exists {len(server_files)} files.")
-            amount, missing_indexes = verify_files(server_files)
-            if(amount == 0):
-                print("[*] All files are up to date.")
-                break
-            else:
-                print(f"[*] Missing {amount} files.")
-                sleep(2)
-                download_files(client_socket, missing_indexes, amount, server_files, token)
-                break
-        else:
-            print(f"[*] Unknown command: {command} {response_json.get('message')}")
+def match_handler(client_socket):
+    global on_match
+    global on_turn
+    while not stop_event.is_set() and on_match:
+        #if(on_turn):
             
-    login_into_server = False
-    
-                
-                        
-def download_files(client_socket, missing_indexes, amount, server_files, token):
-    x = 0
-    for index in missing_indexes:
-        file = server_files[index]
-        
-        package = json.dumps({"token": token, "message": "", "command": "download_images", "image_path": file[0]})
-        client_socket.send(package.encode())
-        print(f"[*] Requesting file: {file[0]} {x} / {amount}")
-        
-        file_data = client_socket.recv(1024 * 1024 * 5).decode() #5MB Buffer for downloading Images
-        file_data_json = json.loads(file_data)
-        
-        if(file_data_json == None):
-            print(f"[*] Empty Packet")
-            continue
-        if(file_data_json.get('command') == "file_download"):
-            path = os.getcwd() + "/StreamingAssets/" + file[0]
-            if(os.name == 'nt'):
-                path = path.replace("/", "\\")
-            imageb64 = file_data_json.get('imageb64')
-            b64_to_image(imageb64, path)
-            print(f"[*] File {path} downloaded.")
-            x += 1
-                    
-def verify_files(server_files):    
-    missing_indexes = []
-    missing_files = 0
-    files = list_files("StreamingAssets")
-    files_checksum = []
-    
-    for file in files:
-        path = os.getcwd() + "/StreamingAssets/" + file
-        if(os.name == 'nt'):
-            path = path.replace("/", "\\")
-        files_checksum.append(calculate_checksum(path))        
-
-    for file in server_files:
-        file_name = file[0]
-        if file_name not in files:
-            missing_files += 1
-            missing_indexes.append(server_files.index(file))
-            print(f"[*] Missing file: {file_name}")
-        else:
-            server_file_checksum = file[1]
-            #check the checksum
-            if(server_file_checksum not in files_checksum):
-                missing_indexes.append(server_files.index(file))
-                missing_files += 1
-                print(f"[*] File {file_name} is outdated or corrupted.")
-
-    return missing_files, missing_indexes
+        #else:
+            pass
 
 def client_handler(client_socket):
     global stop_event
     global token
     global username
     global login_into_server
+    global on_match
+    
+    debug_auto(client_socket)
+    
     try:        
         while not stop_event.is_set():
             if not login_into_server:
                 message = input("Enter a message: ")
             else:
+                if(on_match):
+                    match_handler(client_socket)
                 sleep(1)
                 continue
             if(message and not stop_event.is_set()):
@@ -482,6 +478,97 @@ def check_deck(message, token):
     deck_name = parts[1]
     return True, {"token": token, "message": "Checking deck", "command": "check_deck", "deck_name": deck_name}
 
+#Login Operation
+def login_operation(client_socket):
+    global login_into_server 
+    global token
+    server_files = []
+    x = 0
+    
+    login_into_server= True
+    
+    print(f"[*] Logging in...")
+    print(f"[*] Loading... Please wait ")
+    client_socket.send(json.dumps({"token": token, "message": "", "command": "request_images"}).encode())
+    while(True):
+        response = client_socket.recv(4096).decode()
+        response_json = json.loads(response)
+        if(response_json == None):
+            print(f"[*] Empty Packet")
+            continue
+        command = response_json.get('command')
+        if(command == "request_images"):
+            server_files.append((response_json.get('image'), response_json.get('checksum')))
+            client_socket.send(json.dumps({"token": token, "message": "", "command": "image_received"}).encode())
+        elif(command == "request_images_end"):
+            print(f"[*] There exists {len(server_files)} files.")
+            amount, missing_indexes = verify_files(server_files)
+            if(amount == 0):
+                print("[*] All files are up to date.")
+                break
+            else:
+                print(f"[*] Missing {amount} files.")
+                sleep(2)
+                download_files(client_socket, missing_indexes, amount, server_files, token)
+                break
+        else:
+            print(f"[*] Unknown command: {command} {response_json.get('message')}")
+            
+    login_into_server = False
+                      
+def download_files(client_socket, missing_indexes, amount, server_files, token):
+    x = 0
+    for index in missing_indexes:
+        file = server_files[index]
+        
+        package = json.dumps({"token": token, "message": "", "command": "download_images", "image_path": file[0]})
+        client_socket.send(package.encode())
+        print(f"[*] Requesting file: {file[0]} {x} / {amount}")
+        
+        file_data = client_socket.recv(1024 * 1024 * 5).decode() #5MB Buffer for downloading Images
+        file_data_json = json.loads(file_data)
+        
+        if(file_data_json == None):
+            print(f"[*] Empty Packet")
+            continue
+        if(file_data_json.get('command') == "file_download"):
+            path = os.getcwd() + "/StreamingAssets/" + file[0]
+            if(os.name == 'nt'):
+                path = path.replace("/", "\\")
+            imageb64 = file_data_json.get('imageb64')
+            b64_to_image(imageb64, path)
+            print(f"[*] File {path} downloaded.")
+            x += 1
+                    
+def verify_files(server_files):    
+    missing_indexes = []
+    missing_files = 0
+    files = list_files("StreamingAssets")
+    files_checksum = []
+    
+    for file in files:
+        path = os.getcwd() + "/StreamingAssets/" + file
+        if(os.name == 'nt'):
+            path = path.replace("/", "\\")
+        files_checksum.append(calculate_checksum(path))        
+
+    for file in server_files:
+        file_name = file[0]
+        if file_name not in files:
+            missing_files += 1
+            missing_indexes.append(server_files.index(file))
+            print(f"[*] Missing file: {file_name}")
+        else:
+            server_file_checksum = file[1]
+            #check the checksum
+            if(server_file_checksum not in files_checksum):
+                missing_indexes.append(server_files.index(file))
+                missing_files += 1
+                print(f"[*] File {file_name} is outdated or corrupted.")
+
+    return missing_files, missing_indexes
+
+
 #Image functions
 def b64_to_image(b64_string, image_path):
     with open(image_path, "wb") as file:
@@ -520,6 +607,19 @@ def offline_commands():
             return False
         if(offline_command == "start"):
             return True
+
+def debug_auto(client_socket):
+    global token
+    message = ["login mixxs 123456", "login marcus 123456", "login alan 123456", "match_search"]
+    
+    for m in message:
+        send_status, packed_message = package_message(m, token)
+        if(not send_status):
+            continue
+        print(f"[*] Sending: {m}")
+        package = json.dumps(packed_message)
+        client_socket.send(package.encode())
+        sleep(0.25)
 
 if __name__ == "__main__":
     host = "localhost"

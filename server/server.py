@@ -413,10 +413,8 @@ def handle_client(client_socket, client_address):
             try:
                 if(client_address in logged_users):
                     if(match.player_in_match(logged_users[client_address])):
-                        print(f"[*] Player {logged_users[client_address]} is in match.")
-                        #wait until match is over
-                        while match.player_in_match(logged_users[client_address]):
-                            time.sleep(1)
+                        time.sleep(1)
+                        continue
                         
                 request = client_socket.recv(4096)
                 if not request:
@@ -652,6 +650,12 @@ def login(username, password, client_address):
     response = database.login_user(username, password)
     if(response['status'] == 200):
         logged_users[client_address] = username
+    
+    #if there is no deck active, make the first deck active
+    user_id = database.get_user_id(username)[0]
+    if(database.get_active_deck(user_id) == None):
+        deck_id = database.get_deck_id_by_name("Default", user_id)[0]
+        database.make_deck_active(user_id, deck_id)
     
     return response
 
