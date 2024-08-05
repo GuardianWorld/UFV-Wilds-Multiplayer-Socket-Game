@@ -418,6 +418,9 @@ def handle_client(client_socket, client_address):
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 3)
     client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
     
+    #To be used in the future in case we want to do reconnecting functions
+    client_ip = client_socket.getpeername()[0]
+    
     try:
         while not stop_event.is_set():
             try:
