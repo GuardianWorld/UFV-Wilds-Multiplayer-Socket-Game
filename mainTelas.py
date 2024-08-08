@@ -258,7 +258,19 @@ jogador3 = {
                     '2_5_6_minusculo_anciao_voador','2_5_6_minusculo_anciao_voador']
 }
 
-cartas = 0
-janela = iniciaJanela(1200, 800)
-nome, senha = TelaLogin(janela)
-TelaMenuPrincipal(janela, jogador1, jogador2, jogador3)
+def startInterface(message_queue, response_queue):
+    cartas = 0
+    janela = iniciaJanela(1200, 800)
+
+    while True:
+        nome, senha = TelaLogin(janela, message_queue, response_queue)
+        message_queue.put(f"login {nome} {senha}")
+        resposta = response_queue.get()
+        if(resposta == "logging in"):
+            TelaMenuPrincipal(janela, jogador1, jogador2, jogador3, message_queue, response_queue)
+        else:
+            # mostrar pop-up ou escrever na tela o erro (provavelmente vai ta na 'resposta')
+            continue
+
+if __name__ == "__main__":
+    startInterface()

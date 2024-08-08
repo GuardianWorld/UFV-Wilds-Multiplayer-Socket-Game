@@ -15,7 +15,12 @@ PRETO = (0, 0, 0)
 ################################################Telas#######################################
 # Cria a janela com um tamanho e altura
 
-def TelaLogin(janela):
+def Fechar(message_queue):
+    message_queue.put("exit")
+    pygame.quit()
+    sys.exit()
+
+def TelaLogin(janela, message_queue, response_queue):
     pygame.font.init()
     fonte = pygame.font.SysFont('Arial', 40)
 
@@ -39,8 +44,7 @@ def TelaLogin(janela):
     while True:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 # Se o usuário clicar no campo de entrada, ativa o campo de entrada correspondente
                 if input_box_nome.collidepoint(evento.pos):
@@ -92,7 +96,7 @@ def TelaLogin(janela):
 
         pygame.display.flip()
 
-def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3):
+def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3, message_queue, response_queue):
     rodando = True
     jogador1, jogador2, jogador3 = iniciaJogadores(jogador1, jogador2, jogador3)
     fonte = pygame.font.SysFont('Arial', 50)
@@ -111,13 +115,11 @@ def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3):
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 if botoes['sair'].collidepoint(mouseX, mouseY):
-                    pygame.quit()
-                    sys.exit()
+                    Fechar(message_queue)
                 if botoes['jogar'].collidepoint(mouseX, mouseY):
                     JogoPrincipal(janela, [jogador1, jogador2, jogador3])
                 if botoes['montar_baralho'].collidepoint(mouseX, mouseY):
@@ -145,7 +147,7 @@ def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3):
 #Mostra os baralhos dos jogadores para excluirem ou criarem outro
 
 
-def TelaEscolherAtributo(janela, atributos, turno):
+def TelaEscolherAtributo(janela, atributos, turno, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
     opcoes_atributo = []
 
@@ -166,15 +168,14 @@ def TelaEscolherAtributo(janela, atributos, turno):
 
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 for i, rect in enumerate(opcoes_atributo):
                     if rect.collidepoint(mouseX, mouseY):
                         return atributos[i]  # Retorna o atributo escolhido
 
-def TelaEscolherCarta(janela, cartas, nome_jogador, turno, atributo = 0):
+def TelaEscolherCarta(janela, cartas, nome_jogador, turno, atributo = 0, message_queue = None, response_queue = None):
     fonte = pygame.font.SysFont('Arial', 30)
     fonte_jogador = pygame.font.SysFont('Arial', 40)
     opcoes_carta = []
@@ -232,8 +233,7 @@ def TelaEscolherCarta(janela, cartas, nome_jogador, turno, atributo = 0):
 
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 for idx, pos in enumerate(posicoes):
@@ -250,7 +250,7 @@ def TelaEscolherCarta(janela, cartas, nome_jogador, turno, atributo = 0):
 
 #olha a seleção de baralhos e escolhe 1
 
-def TelaEscolherBaralho(janela, jogador):
+def TelaEscolherBaralho(janela, jogador, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
     baralhos = jogador['baralhos']
     opcoes_baralho = []
@@ -272,8 +272,7 @@ def TelaEscolherBaralho(janela, jogador):
 
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 for i, rect in enumerate(opcoes_baralho):
@@ -281,7 +280,7 @@ def TelaEscolherBaralho(janela, jogador):
                         return baralhos[i]  # Retorna o baralho escolhido
 
 
-def TelaVencedor(janela, nome_jogador_vencedor, turno):
+def TelaVencedor(janela, nome_jogador_vencedor, turno, message_queue, response_queue):
     pygame.font.init()
     fonte = pygame.font.SysFont('Arial', 40)
     fonte_botao = pygame.font.SysFont('Arial', 30)
@@ -309,15 +308,14 @@ def TelaVencedor(janela, nome_jogador_vencedor, turno):
     while True:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 if (x_botao < mouseX < x_botao + largura_botao and
                     y_botao < mouseY < y_botao + altura_botao):
                     return  # Retorna à tela principal
 
-def TelaMudarBaralho(janela, jogadores):
+def TelaMudarBaralho(janela, jogadores, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
     caixas_texto = [
         {'rect': pygame.Rect(100, 100, 300, 50), 'texto': 'Montar Baralho Jogador 1', 'jogador': jogadores[0]},
@@ -337,8 +335,7 @@ def TelaMudarBaralho(janela, jogadores):
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 # Verificar se o botão de voltar foi clicado
@@ -366,7 +363,7 @@ def TelaMudarBaralho(janela, jogadores):
         pygame.display.update()
 
 
-def TelaSelecionarCartas(janela, todasCartas):
+def TelaSelecionarCartas(janela, todasCartas, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 20)
     cartas_selecionadas = []
     imagens_cartas = {}
@@ -402,8 +399,7 @@ def TelaSelecionarCartas(janela, todasCartas):
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 if evento.button == 1:  # Botão esquerdo do mouse
@@ -452,7 +448,7 @@ def TelaSelecionarCartas(janela, todasCartas):
     return cartas_selecionadas
 
 
-def TelaMostrarCartasBaralho(janela, baralho, jogador):
+def TelaMostrarCartasBaralho(janela, baralho, jogador, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 20)
     imagens_cartas = {}
     posicoes = []
@@ -497,8 +493,7 @@ def TelaMostrarCartasBaralho(janela, baralho, jogador):
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
 
@@ -533,7 +528,7 @@ def TelaMostrarCartasBaralho(janela, baralho, jogador):
 
         pygame.display.update()
 
-def TelaMontarBaralhoJogador(janela, jogador):
+def TelaMontarBaralhoJogador(janela, jogador, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
     caixas_texto = []
     # Função para atualizar a lista de baralhos
@@ -570,8 +565,7 @@ def TelaMontarBaralhoJogador(janela, jogador):
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 for caixa in caixas_texto:
@@ -610,7 +604,7 @@ def TelaMontarBaralhoJogador(janela, jogador):
 
         pygame.display.update()
 
-def TelaVencedorFinal(janela, nome_vencedor, jogador1, jogador2, jogador3):
+def TelaVencedorFinal(janela, nome_vencedor, jogador1, jogador2, jogador3, message_queue, response_queue):
     # Fonte para o texto do vencedor
     fonte_vencedor = pygame.font.SysFont('Arial', 60)
     fonte_botao = pygame.font.SysFont('Arial', 40)
@@ -630,8 +624,7 @@ def TelaVencedorFinal(janela, nome_vencedor, jogador1, jogador2, jogador3):
 
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                Fechar(message_queue)
             elif evento.type == pygame.MOUSEBUTTONDOWN:
                 if botao_rect.collidepoint(evento.pos):
                     TelaMenuPrincipal(janela, jogador1, jogador2, jogador3)
