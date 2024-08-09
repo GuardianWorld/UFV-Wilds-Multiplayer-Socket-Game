@@ -1,8 +1,8 @@
 import pygame
 import sys
 import random
-import os
-import re
+import math
+import time
 
 
 # Inicializar o Pygame
@@ -20,17 +20,26 @@ def Fechar(message_queue):
     pygame.quit()
     sys.exit()
 
-def TelaLogin(janela, message_queue, response_queue):
+def TelaLogin(janela, message_queue, response_queue, imagemFundo):
     pygame.font.init()
     fonte = pygame.font.SysFont('Arial', 40)
 
-    input_box_nome = pygame.Rect(100, 100, 200, 50)
-    input_box_senha = pygame.Rect(100, 200, 200, 50)
-    botao_login = pygame.Rect(100, 300, 200, 50)
+    # Carrega a imagem de fundo
+    fundo = pygame.image.load(imagemFundo)
+    fundo = pygame.transform.scale(fundo, janela.get_size())
+
+    largura_janela, altura_janela = janela.get_size()
+
+    # Centraliza as caixas de texto e botões
+    input_box_nome = pygame.Rect((largura_janela - 200) // 2, altura_janela // 3, 200, 50)
+    input_box_senha = pygame.Rect((largura_janela - 200) // 2, altura_janela // 3 + 80, 200, 50)
+    botao_login = pygame.Rect((largura_janela - 200) // 2, altura_janela // 3 + 160, 200, 50)
+    botao_registrar = pygame.Rect((largura_janela - 200) // 2, altura_janela // 3 + 240, 200, 50)
 
     cor_ativo = pygame.Color('dodgerblue2')
     cor_inativo = pygame.Color('lightskyblue3')
     cor_botao = pygame.Color('gray15')
+    cor_caixa_texto = pygame.Color('white')
 
     cor_nome = cor_inativo
     cor_senha = cor_inativo
@@ -54,8 +63,11 @@ def TelaLogin(janela, message_queue, response_queue):
                     ativo_senha = True
                     ativo_nome = False
                 elif botao_login.collidepoint(evento.pos):
-                    # Retorna o nome e senha quando o botão de login é clicado
-                    return texto_nome, texto_senha
+                    # Retorna o nome, senha e 0 para login
+                    return texto_nome, texto_senha, 0
+                elif botao_registrar.collidepoint(evento.pos):
+                    # Retorna o nome, senha e 1 para registrar
+                    return texto_nome, texto_senha, 1
                 else:
                     ativo_nome = False
                     ativo_senha = False
@@ -75,7 +87,7 @@ def TelaLogin(janela, message_queue, response_queue):
                     else:
                         texto_senha += evento.unicode
 
-        janela.fill(BRANCO)
+        janela.blit(fundo, (0, 0))
         txt_surface_nome = fonte.render(texto_nome, True, PRETO)
         txt_surface_senha = fonte.render('*' * len(texto_senha), True, PRETO)
 
@@ -83,7 +95,9 @@ def TelaLogin(janela, message_queue, response_queue):
         input_box_nome.w = largura_max
         input_box_senha.w = largura_max
 
-        # Desenha os campos de texto
+        # Desenha os campos de texto com fundo branco
+        pygame.draw.rect(janela, cor_caixa_texto, input_box_nome)
+        pygame.draw.rect(janela, cor_caixa_texto, input_box_senha)
         janela.blit(txt_surface_nome, (input_box_nome.x + 5, input_box_nome.y + 5))
         janela.blit(txt_surface_senha, (input_box_senha.x + 5, input_box_senha.y + 5))
         pygame.draw.rect(janela, cor_nome, input_box_nome, 2)
@@ -91,25 +105,39 @@ def TelaLogin(janela, message_queue, response_queue):
 
         # Desenha o botão de login
         pygame.draw.rect(janela, cor_botao, botao_login)
-        texto_botao = fonte.render('Login', True, BRANCO)
-        janela.blit(texto_botao, (botao_login.x + 50, botao_login.y + 5))
+        texto_botao_login = fonte.render('Login', True, BRANCO)
+        janela.blit(texto_botao_login, (botao_login.x + 50, botao_login.y + 5))
+
+        # Desenha o botão de registrar
+        pygame.draw.rect(janela, cor_botao, botao_registrar)
+        texto_botao_registrar = fonte.render('Registrar', True, BRANCO)
+        janela.blit(texto_botao_registrar, (botao_registrar.x + 35, botao_registrar.y + 5))
 
         pygame.display.flip()
 
-def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3, message_queue, response_queue):
+def TelaMenuPrincipal(janela, message_queue, response_queue, imagemFundo):
     rodando = True
-    jogador1, jogador2, jogador3 = iniciaJogadores(jogador1, jogador2, jogador3)
-    fonte = pygame.font.SysFont('Arial', 50)
+    fonte_titulo = pygame.font.SysFont('Arial', 100, bold=True)  # Título maior e em negrito
+    fonte_botoes = pygame.font.SysFont('Arial', 50)
+
+    # Carrega a imagem de fundo
+    fundo = pygame.image.load(imagemFundo)
+    fundo = pygame.transform.scale(fundo, janela.get_size())
 
     # Definir áreas dos botões
     largura_botao = 200
     altura_botao = 60
-    margem = 20
 
     botoes = {
-        'sair': pygame.Rect(500, 400, largura_botao, altura_botao),
-        'jogar': pygame.Rect(500, 500, largura_botao, altura_botao),
-        'montar_baralho': pygame.Rect(500, 600, largura_botao, altura_botao)
+        'Jogar': pygame.Rect(500, 400, largura_botao, altura_botao),
+        'Baralhos': pygame.Rect(500, 500, largura_botao, altura_botao),
+        'Sair': pygame.Rect(500, 600, largura_botao, altura_botao)
+    }
+
+    cores_botoes = {
+        'Jogar': (0, 128, 255),  # Azul
+        'Baralhos': (255, 165, 0),  # Laranja
+        'Sair': (255, 69, 0)  # Vermelho
     }
 
     while rodando:
@@ -118,137 +146,296 @@ def TelaMenuPrincipal(janela, jogador1, jogador2, jogador3, message_queue, respo
                 Fechar(message_queue)
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
-                if botoes['sair'].collidepoint(mouseX, mouseY):
-                    Fechar(message_queue)
-                if botoes['jogar'].collidepoint(mouseX, mouseY):
-                    JogoPrincipal(janela, [jogador1, jogador2, jogador3])
-                if botoes['montar_baralho'].collidepoint(mouseX, mouseY):
-                    TelaMudarBaralho(janela, [jogador1, jogador2, jogador3])
+                if botoes['Sair'].collidepoint(mouseX, mouseY):
+                    return 0
+                if botoes['Jogar'].collidepoint(mouseX, mouseY):
+                    return 2
+                if botoes['Baralhos'].collidepoint(mouseX, mouseY):
+                    return 1
 
-        janela.fill(BRANCO)
-        titulo = fonte.render('Jogo de Cartas', True, PRETO)
-        sair = fonte.render('Sair', True, PRETO)
-        jogar = fonte.render('Jogar', True, PRETO)
-        montar_baralho = fonte.render('Montar Baralho', True, PRETO)
+        janela.blit(fundo, (0, 0))
 
-        janela.blit(titulo, (450, 100))
+        # Renderizar e desenhar o título maior e mais destacado
+        titulo = fonte_titulo.render('UFV WILDS', True, (255, 255, 255))  # Branco
+        titulo_rect = titulo.get_rect(center=(janela.get_width() // 2, 150))
+        janela.blit(titulo, titulo_rect)
 
-        # Desenhar os botões
-        pygame.draw.rect(janela, BRANCO, botoes['sair'])
-        pygame.draw.rect(janela, BRANCO, botoes['jogar'])
-        pygame.draw.rect(janela, BRANCO, botoes['montar_baralho'])
-
-        janela.blit(sair, (botoes['sair'].x + 10, botoes['sair'].y + 10))
-        janela.blit(jogar, (botoes['jogar'].x + 10, botoes['jogar'].y + 10))
-        janela.blit(montar_baralho, (botoes['montar_baralho'].x + 10, botoes['montar_baralho'].y + 10))
+        # Desenhar os botões com cores diferentes
+        for chave, botao in botoes.items():
+            pygame.draw.rect(janela, cores_botoes[chave], botao)
+            texto_botao = fonte_botoes.render(chave.replace('_', ' ').capitalize(), True, (255, 255, 255))
+            texto_botao_rect = texto_botao.get_rect(center=botao.center)
+            janela.blit(texto_botao, texto_botao_rect)
 
         pygame.display.update()
 
-#Mostra os baralhos dos jogadores para excluirem ou criarem outro
+def TelaCarregamento(janela, pathImagemTelaPrincipal):
+    # Definições de constantes
+    BRANCO = (255, 255, 255)
+    AZUL = (0, 0, 255)
+    CINZA = (169, 169, 169)
+    LARGURA_CIRCULO = 50
+    VELOCIDADE_ANIMACAO = 5
+    largura_tela = janela.get_width()
+    altura_tela = janela.get_height()
+    try:
+        imagem_fundo = pygame.image.load(pathImagemTelaPrincipal).convert()
+        imagem_fundo = pygame.transform.scale(imagem_fundo, (largura_tela, altura_tela))
+    except pygame.error as e:
+        print(f"Erro ao carregar a imagem de fundo: {e}")
+        pygame.quit()
+        sys.exit()
 
-
-def TelaEscolherAtributo(janela, atributos, turno, message_queue, response_queue):
-    fonte = pygame.font.SysFont('Arial', 30)
-    opcoes_atributo = []
+    fonte = pygame.font.Font(None, 74)
+    texto_carregando = fonte.render('Carregando...', True, CINZA)
+    texto_rect = texto_carregando.get_rect(center=(largura_tela // 2, altura_tela // 2))
 
     while True:
-        janela.fill(BRANCO)
-        titulo = fonte.render(f'Escolha um Atributo para o Turno {turno}', True, PRETO)
-        janela.blit(titulo, (50, 50))
+        janela.blit(imagem_fundo, (0, 0))  # Desenha a imagem de fundo
+        janela.blit(texto_carregando, texto_rect)  # Desenha a mensagem "Carregando..."
 
-        y_offset = 150
-        for i, atributo in enumerate(atributos):
-            texto_atributo = fonte.render(atributo, True, PRETO)
-            retangulo_atributo = pygame.Rect(50, y_offset + i * 60, 300, 50)
-            pygame.draw.rect(janela, PRETO, retangulo_atributo, 2)
-            janela.blit(texto_atributo, (retangulo_atributo.x + 5, retangulo_atributo.y + 5))
-            opcoes_atributo.append(retangulo_atributo)
+        pygame.display.flip()
 
-        pygame.display.update()
+        # Eventos
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                Fechar(message_queue)
-            if evento.type == pygame.MOUSEBUTTONDOWN:
-                mouseX, mouseY = pygame.mouse.get_pos()
-                for i, rect in enumerate(opcoes_atributo):
-                    if rect.collidepoint(mouseX, mouseY):
-                        return atributos[i]  # Retorna o atributo escolhido
+def TelaPartida(janela, cartas, turno, imagemPantano):
+    # Definições de constantes
+    LARGURA_CARTA = 250  # Aumenta o tamanho das cartas
+    ALTURA_CARTA = 350  # Aumenta o tamanho das cartas
+    MARGEM = 30  # Margem entre as cartas
+    MARGEM_SUPERIOR = 50  # Margem superior
+    LARGURA_BOTAO = 200
+    ALTURA_BOTAO = 50
+    BRANCO = (255, 255, 255)
+    PRETO = (0, 0, 0)
+    AMARELO = (255, 255, 0)
+    VERDE = (0, 255, 0)
+    VERMELHO = (255, 0, 0)
 
-def TelaEscolherCarta(janela, cartas, nome_jogador, turno, atributo = 0, message_queue = None, response_queue = None):
-    fonte = pygame.font.SysFont('Arial', 30)
-    fonte_jogador = pygame.font.SysFont('Arial', 40)
-    opcoes_carta = []
+    largura_tela = janela.get_width()
+    altura_tela = janela.get_height()
 
-    # Carregar imagens das cartas com um tamanho menor
-    imagens_cartas = {}
-    largura_imagem = 100  # Diminuir largura da imagem
-    altura_imagem = 155  # Diminuir altura da imagem
+    # Coordenadas das cartas ajustadas para centralizar
+    pos_x = (largura_tela - (LARGURA_CARTA * 3 + MARGEM * 2)) // 2  # Ajusta a posição x
+    pos_y = (altura_tela - ALTURA_CARTA) // 2  # Centraliza a posição y
+    pos_y_botoes = altura_tela - (ALTURA_BOTAO + 30)  # Posição do botão na parte inferior
 
-    for carta in cartas:
-        nome_imagem = carta['Imagem']
-        try:
-            imagem = pygame.image.load(f'cartas/{nome_imagem}.jpg')
-            imagem = pygame.transform.scale(imagem, (largura_imagem, altura_imagem))
-            imagens_cartas[nome_imagem] = imagem
-        except pygame.error:
-            q = 1
+    # Carregar imagem de fundo
+    try:
+        fundo = pygame.image.load(imagemPantano).convert()
+        fundo = pygame.transform.scale(fundo, (largura_tela, altura_tela))
+    except pygame.error as e:
+        print(f"Erro ao carregar a imagem de fundo: {e}")
+        pygame.quit()
+        sys.exit()
+
+    # Carregar imagens das cartas
+    imagens_cartas = [pygame.image.load(carta).convert_alpha() for carta in cartas]
+    selecao = None
+
+    fonte_titulo = pygame.font.Font(None, 50)
+    texto_turno = fonte_titulo.render(f'Turno: {turno}', True, PRETO)  # Cor do texto do turno ajustada para preto
+    texto_turno_rect = texto_turno.get_rect(center=(largura_tela // 2, MARGEM_SUPERIOR // 2))
+
+    # Desenho da caixa ao redor do texto
+    margem_caixa = 10
+    caixa_rect = texto_turno_rect.inflate(2 * margem_caixa, 2 * margem_caixa)
+    caixa_rect.topleft = (texto_turno_rect.left - margem_caixa, texto_turno_rect.top - margem_caixa)
 
     while True:
-        janela.fill(BRANCO)
+        janela.blit(fundo, (0, 0))  # Desenha o fundo
 
-        # Exibir o nome do jogador atual
-        if(atributo == 0):
-            texto_jogador = fonte_jogador.render(f"Turno {turno} | Escolha de: {nome_jogador}", True, PRETO)
-        else:
-            texto_jogador = fonte_jogador.render(f"Turno {turno} | Escolha de: {nome_jogador} | Atributo {atributo}", True, PRETO)
-        janela.blit(texto_jogador, (50, 10))
+        # Desenhar a caixa branca ao redor do texto do turno
+        pygame.draw.rect(janela, BRANCO, caixa_rect)
 
-        titulo = fonte.render('Escolha uma Carta', True, PRETO)
-        janela.blit(titulo, (50, 70))
+        # Desenhar o título do turno
+        janela.blit(texto_turno, texto_turno_rect)
 
-        # Gerar posições para as imagens das cartas
-        colunas = 4
-        margem = 30
-        posicoes = []
+        # Desenhar as cartas
+        for idx, imagem in enumerate(imagens_cartas):
+            rect = pygame.Rect(pos_x + idx * (LARGURA_CARTA + MARGEM), pos_y, LARGURA_CARTA, ALTURA_CARTA)
+            janela.blit(pygame.transform.scale(imagem, (LARGURA_CARTA, ALTURA_CARTA)), rect)
 
-        for i in range(len(cartas)):
-            x = margem + (i % colunas) * (largura_imagem + margem)
-            y = 200 + (i // colunas) * (altura_imagem + margem)  # Mover as cartas para mais embaixo
-            posicoes.append(pygame.Rect(x, y, largura_imagem, altura_imagem))
+            # Desenhar borda amarela se a carta estiver selecionada
+            if selecao == idx:
+                pygame.draw.rect(janela, VERMELHO, rect, 5)
 
-        # Desenhar as imagens das cartas
-        for idx, carta in enumerate(cartas):
-            nome_imagem = carta['Imagem']
-            imagem = imagens_cartas.get(nome_imagem, None)
-            if imagem:
-                pos = posicoes[idx]
-                janela.blit(imagem, pos.topleft)
+        # Desenhar o botão de confirmação
+        botao_rect = pygame.Rect((largura_tela - LARGURA_BOTAO) // 2, pos_y_botoes, LARGURA_BOTAO, ALTURA_BOTAO)
+        pygame.draw.rect(janela, VERDE, botao_rect)
+        fonte_botao = pygame.font.Font(None, 36)
+        texto_botao = fonte_botao.render('Confirmar', True, BRANCO)
+        texto_botao_rect = texto_botao.get_rect(center=botao_rect.center)
+        janela.blit(texto_botao, texto_botao_rect)
 
-                # Adicionar borda para a carta selecionada
-                if carta in opcoes_carta:
-                    pygame.draw.rect(janela, (255, 0, 0), pos, 3)  # Borda vermelha para a carta selecionada
+        pygame.display.flip()
 
-        pygame.display.update()
+        # Eventos
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                Fechar(message_queue)
-            if evento.type == pygame.MOUSEBUTTONDOWN:
-                mouseX, mouseY = pygame.mouse.get_pos()
-                for idx, pos in enumerate(posicoes):
-                    if pos.collidepoint(mouseX, mouseY):
-                        carta = cartas[idx]
-                        if carta not in opcoes_carta:
-                            opcoes_carta = [carta]  # Selecionar apenas uma carta
-                        else:
-                            opcoes_carta = []  # Deselecionar se a mesma carta for clicada novamente
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                pos = pygame.mouse.get_pos()
 
-                # Verificar se o botão de confirmar seleção foi clicado
-                if len(opcoes_carta) > 0:
-                    return opcoes_carta[0]   # Retorna a carta escolhida
+                # Verificar se o botão de confirmação foi clicado
+                if botao_rect.collidepoint(pos) and selecao is not None:
+                    return cartas[selecao]  # Retorna a carta selecionada
 
-#olha a seleção de baralhos e escolhe 1
+                # Verificar se uma das cartas foi clicada
+                for idx in range(len(cartas)):
+                    rect = pygame.Rect(pos_x + idx * (LARGURA_CARTA + MARGEM), pos_y, LARGURA_CARTA, ALTURA_CARTA)
+                    if rect.collidepoint(pos):
+                        selecao = idx
+
+def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano):
+    BRANCO = (255, 255, 255)
+    AMARELO = (255, 255, 0)
+    fonte = pygame.font.Font(None, 100)
+
+    # Carregar imagem de fundo
+    try:
+        fundo = pygame.image.load(imagemPantano).convert()
+        fundo = pygame.transform.scale(fundo, (janela.get_width(), janela.get_height()))
+    except pygame.error as e:
+        print(f"Erro ao carregar a imagem de fundo: {e}")
+        pygame.quit()
+        sys.exit()
+
+    if jogo_completo:
+        mensagem = f'{vencedor} venceu o jogo!'
+    else:
+        mensagem = f'{vencedor} venceu o turno {turno}!'
+
+    texto_mensagem = fonte.render(mensagem, True, AMARELO)
+    texto_rect = texto_mensagem.get_rect(center=(janela.get_width() // 2, janela.get_height() // 2))
+
+    piscar_repeticoes = 3
+    intervalo_piscar = 500  # Milissegundos entre piscadas
+    intervalo_pausa = 500  # Milissegundos de pausa após as piscadas
+
+    clock = pygame.time.Clock()
+    tempo_inicio = pygame.time.get_ticks()
+    piscando = True
+    piscado_repeticoes = 0
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        janela.blit(fundo, (0, 0))  # Desenha a imagem de fundo
+
+        tempo_atual = pygame.time.get_ticks()
+        if piscando:
+            if (tempo_atual - tempo_inicio) % (2 * intervalo_piscar) < intervalo_piscar:
+                janela.blit(texto_mensagem, texto_rect)
+            if (tempo_atual - tempo_inicio) >= (piscar_repeticoes * intervalo_piscar + intervalo_pausa):
+                piscado_repeticoes += 1
+                if piscado_repeticoes >= piscar_repeticoes:
+                    pygame.display.flip()
+                    pygame.time.wait(intervalo_pausa)  # Pausa após as piscadas
+                    return  # Retorna após concluir a exibição
+
+        pygame.display.flip()
+        clock.tick(30)
+
+def TelaSelecaoAtributo(janela, imagemPantano):
+    # Definições de constantes
+    LARGURA_BOTAO = 300
+    ALTURA_BOTAO = 50
+    MARGEM = 20
+    BRANCO = (255, 255, 255)
+    CINZA = (192, 192, 192)
+    AMARELO = (255, 255, 0)
+    VERMELHO = (255, 0, 0)
+    PRETO = (0, 0, 0)
+    VERDE = (0, 255, 0)
+    atributos = ['Força', 'Fofura', 'Velocidade', 'Tamanho', 'Idade', 'Tipo']
+    pos_y = 200  # Ajusta a posição vertical dos botões
+    selecao = None
+
+    fonte_titulo = pygame.font.Font(None, 50)
+    texto_titulo = fonte_titulo.render('Selecione um Atributo', True, PRETO)
+    texto_titulo_rect = texto_titulo.get_rect(center=(janela.get_width() // 2, 50))
+
+    # Adicionar uma caixa branca ao redor do título
+    caixa_branca_rect = texto_titulo_rect.inflate(20, 20)  # Aumenta o retângulo para criar margem
+    caixa_branca_rect.center = texto_titulo_rect.center  # Centraliza a caixa em relação ao título
+
+    # Carregar imagem de fundo
+    try:
+        fundo = pygame.image.load(imagemPantano).convert()
+        fundo = pygame.transform.scale(fundo, (janela.get_width(), janela.get_height()))
+    except pygame.error as e:
+        print(f"Erro ao carregar a imagem de fundo: {e}")
+        pygame.quit()
+        sys.exit()
+
+    while True:
+        janela.blit(fundo, (0, 0))  # Desenha o fundo
+
+        # Desenhar a caixa branca ao redor do título
+        pygame.draw.rect(janela, BRANCO, caixa_branca_rect)
+
+        # Desenhar o título
+        janela.blit(texto_titulo, texto_titulo_rect)
+
+        # Desenhar botões para atributos
+        for idx, atributo in enumerate(atributos):
+            botao_rect = pygame.Rect((janela.get_width() - LARGURA_BOTAO) // 2, pos_y + idx * (ALTURA_BOTAO + MARGEM),
+                                     LARGURA_BOTAO, ALTURA_BOTAO)
+            pygame.draw.rect(janela, AMARELO, botao_rect)
+            fonte_botao = pygame.font.Font(None, 36)
+            texto_botao = fonte_botao.render(atributo, True, PRETO)
+            texto_botao_rect = texto_botao.get_rect(center=botao_rect.center)
+            janela.blit(texto_botao, texto_botao_rect)
+
+            # Desenhar borda cinza se o atributo estiver selecionado
+            if selecao == idx:
+                pygame.draw.rect(janela, VERMELHO, botao_rect, 5)
+
+        # Desenhar o botão "Confirmar" se um atributo for selecionado
+        if selecao is not None:
+            botao_confirmar = pygame.Rect((janela.get_width() - LARGURA_BOTAO) // 2,
+                                          pos_y + len(atributos) * (ALTURA_BOTAO + MARGEM),
+                                          LARGURA_BOTAO, ALTURA_BOTAO)
+            pygame.draw.rect(janela, VERDE, botao_confirmar)
+            texto_confirmar = fonte_botao.render('Confirmar', True, BRANCO)
+            texto_confirmar_rect = texto_confirmar.get_rect(center=botao_confirmar.center)
+            janela.blit(texto_confirmar, texto_confirmar_rect)
+
+        pygame.display.flip()
+
+        # Eventos
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                pos = pygame.mouse.get_pos()
+
+                # Verificar se um dos botões de atributo foi clicado
+                for idx in range(len(atributos)):
+                    botao_rect = pygame.Rect((janela.get_width() - LARGURA_BOTAO) // 2,
+                                             pos_y + idx * (ALTURA_BOTAO + MARGEM), LARGURA_BOTAO, ALTURA_BOTAO)
+                    if botao_rect.collidepoint(pos):
+                        selecao = idx
+
+                # Verificar se o botão "Confirmar" foi clicado
+                if selecao is not None:
+                    botao_confirmar = pygame.Rect((janela.get_width() - LARGURA_BOTAO) // 2,
+                                                  pos_y + len(atributos) * (ALTURA_BOTAO + MARGEM),
+                                                  LARGURA_BOTAO, ALTURA_BOTAO)
+                    if botao_confirmar.collidepoint(pos):
+                        return atributos[selecao]
 
 def TelaEscolherBaralho(janela, jogador, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
@@ -279,575 +466,392 @@ def TelaEscolherBaralho(janela, jogador, message_queue, response_queue):
                     if rect.collidepoint(mouseX, mouseY):
                         return baralhos[i]  # Retorna o baralho escolhido
 
-
-def TelaVencedor(janela, nome_jogador_vencedor, turno, message_queue, response_queue):
-    pygame.font.init()
-    fonte = pygame.font.SysFont('Arial', 40)
-    fonte_botao = pygame.font.SysFont('Arial', 30)
-
-    # Cor do botão e do texto
-    cor_botao = (0, 128, 0)  # Verde
-    cor_texto_botao = (255, 255, 255)  # Branco
-
-    # Exibe o nome do jogador vencedor
-    janela.fill((255, 255, 255))  # Fundo branco
-    texto_vencedor = fonte.render(f"O jogador: {nome_jogador_vencedor} Foi o vencedor do Turno {turno}", True, (0, 0, 0))
-    janela.blit(texto_vencedor, (50, 50))
-
-    # Desenha o botão "Continuar"
-    largura_botao = 200
-    altura_botao = 50
-    x_botao = (janela.get_width() - largura_botao) // 2
-    y_botao = janela.get_height() - altura_botao - 50
-    pygame.draw.rect(janela, cor_botao, pygame.Rect(x_botao, y_botao, largura_botao, altura_botao))
-    texto_botao = fonte_botao.render("Continuar", True, cor_texto_botao)
-    janela.blit(texto_botao, (x_botao + 50, y_botao + 10))
-
-    pygame.display.update()
-
-    while True:
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                Fechar(message_queue)
-            if evento.type == pygame.MOUSEBUTTONDOWN:
-                mouseX, mouseY = pygame.mouse.get_pos()
-                if (x_botao < mouseX < x_botao + largura_botao and
-                    y_botao < mouseY < y_botao + altura_botao):
-                    return  # Retorna à tela principal
-
-def TelaMudarBaralho(janela, jogadores, message_queue, response_queue):
+def TelaMudarBaralho(janela, message_queue, response_queue, imagemFundo):
+    pygame.init()
     fonte = pygame.font.SysFont('Arial', 30)
+    largura_janela = janela.get_width()
+    altura_janela = janela.get_height()
+
+    largura_caixa = 300
+    altura_caixa = 50
+
+    # Carregar e redimensionar a imagem de fundo
+    try:
+        fundo = pygame.image.load(imagemFundo)
+        fundo = pygame.transform.scale(fundo, (largura_janela, altura_janela))
+    except pygame.error as e:
+        print(f"Erro ao carregar a imagem de fundo: {e}")
+        pygame.quit()
+        sys.exit()
+
     caixas_texto = [
-        {'rect': pygame.Rect(100, 100, 300, 50), 'texto': 'Montar Baralho Jogador 1', 'jogador': jogadores[0]},
-        {'rect': pygame.Rect(100, 200, 300, 50), 'texto': 'Montar Baralho Jogador 2', 'jogador': jogadores[1]},
-        {'rect': pygame.Rect(100, 300, 300, 50), 'texto': 'Montar Baralho Jogador 3', 'jogador': jogadores[2]},
+        {'rect': pygame.Rect((largura_janela - largura_caixa) // 2, 100, largura_caixa, altura_caixa),
+         'texto': 'Ver Decks', 'retorno': 0},
+        {'rect': pygame.Rect((largura_janela - largura_caixa) // 2, 200, largura_caixa, altura_caixa),
+         'texto': 'Ver Coleção', 'retorno': 1},
+        {'rect': pygame.Rect((largura_janela - largura_caixa) // 2, 300, largura_caixa, altura_caixa),
+         'texto': 'Criar Deck', 'retorno': 2}
     ]
 
     # Adicionar botão de voltar
     largura_botao_voltar = 200
     altura_botao_voltar = 50
-    botao_voltar = pygame.Rect(10, janela.get_height() - altura_botao_voltar - 10, largura_botao_voltar,
-                               altura_botao_voltar)
-    texto_botao_voltar = fonte.render('Voltar ao Menu', True, (255, 255, 255))
+    botao_voltar = pygame.Rect((largura_janela - largura_botao_voltar) // 2,
+                               altura_janela - altura_botao_voltar - 10,
+                               largura_botao_voltar, altura_botao_voltar)
+    texto_botao_voltar = fonte.render('Voltar ao Menu', True, (0, 0, 0))  # Texto preto
 
     rodando = True
 
     while rodando:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                Fechar(message_queue)
+                pygame.quit()
+                sys.exit()
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 mouseX, mouseY = pygame.mouse.get_pos()
                 # Verificar se o botão de voltar foi clicado
                 if botao_voltar.collidepoint(mouseX, mouseY):
                     rodando = False
-                    TelaMenuPrincipal(janela, jogadores[0], jogadores[1], jogadores[2])  # Função para retornar ao menu principal
+                    return 3  # Retorna 3 quando o botão de voltar é clicado
 
                 for caixa in caixas_texto:
                     if caixa['rect'].collidepoint(mouseX, mouseY):
-                        jogador = caixa['jogador']  # Obter o jogador da caixa de texto
-                        TelaMontarBaralhoJogador(janela, jogador)
+                        rodando = False
+                        return caixa['retorno']  # Retorna o número correspondente à ação selecionada
 
-        janela.fill((255, 255, 255))  # Cor de fundo branca
+        # Desenhar a imagem de fundo
+        janela.blit(fundo, (0, 0))
 
-        # Desenhar os botões dos baralhos existentes
+        # Desenhar os botões das opções com fundo branco
         for caixa in caixas_texto:
-            pygame.draw.rect(janela, (0, 0, 0), caixa['rect'], 2)
-            texto = fonte.render(caixa['texto'], True, (0, 0, 0))
+            pygame.draw.rect(janela, (255, 255, 255), caixa['rect'])  # Fundo branco
+            pygame.draw.rect(janela, (0, 0, 0), caixa['rect'], 2)  # Borda preta
+            texto = fonte.render(caixa['texto'], True, (0, 0, 0))  # Texto preto
             janela.blit(texto, (caixa['rect'].x + 5, caixa['rect'].y + 5))
 
-        # Desenhar o botão de voltar
-        pygame.draw.rect(janela, (255, 0, 0), botao_voltar)  # Botão vermelho
+        # Desenhar o botão de voltar com fundo branco
+        pygame.draw.rect(janela, (255, 255, 255), botao_voltar)  # Fundo branco
+        pygame.draw.rect(janela, (255, 0, 0), botao_voltar, 2)  # Borda vermelha
         janela.blit(texto_botao_voltar, (botao_voltar.x + 5, botao_voltar.y + 10))
 
         pygame.display.update()
 
 
-def TelaSelecionarCartas(janela, todasCartas, message_queue, response_queue):
-    fonte = pygame.font.SysFont('Arial', 20)
+def TelaCriarDeck(janela, todasCartas, imagemFundo):
+    # Definições de constantes
+    LARGURA_CARTA = 100
+    ALTURA_CARTA = 140
+    MARGEM = 10
+    LIMITE_CARTAS = 9  # Máximo de cartas que podem ser selecionadas
+    LARGURA_BOTAO = 150
+    ALTURA_BOTAO = 50
+
+    # Cores
+    BRANCO = (255, 255, 255)
+    VERDE = (0, 255, 0)
+    AZUL = (0, 0, 255)
+    VERMELHO = (255, 0, 0)
+    CINZA = (169, 169, 169)
+
+    largura_tela = janela.get_width()
+    altura_tela = janela.get_height()
+
+    # Carregar imagem de fundo
+    try:
+        fundo = pygame.image.load(imagemFundo).convert()
+        fundo = pygame.transform.scale(fundo, (largura_tela, altura_tela))
+    except pygame.error as e:
+        print(f"Erro ao carregar a imagem de fundo: {e}")
+        pygame.quit()
+        sys.exit()
+
+    # Carregar imagens das cartas
+    imagens_cartas = [pygame.image.load(carta).convert_alpha() for carta in todasCartas]
+
+    # Inicializar variáveis
+    quantidade = [0] * len(todasCartas)
+    total_selecionadas = 0
     cartas_selecionadas = []
-    imagens_cartas = {}
 
-    # Carregar imagens das cartas com um tamanho menor
-    for nome in todasCartas:
-        try:
-            imagem = pygame.image.load(f'cartas/{nome}.jpg')
-            imagem = pygame.transform.scale(imagem, (80, 120))  # Reduzir o tamanho das imagens
-            imagens_cartas[nome] = imagem
-        except pygame.error:
-                p= 1
-    # Gerar posições para as imagens das cartas
-    colunas = 5
-    margem = 10
-    largura_imagem = 80
-    altura_imagem = 120
-    posicoes = []
-
-    for i in range(len(todasCartas)):
-        x = margem + (i % colunas) * (largura_imagem + margem)
-        y = margem + (i // colunas) * (altura_imagem + margem)
-        posicoes.append(pygame.Rect(x, y, largura_imagem, altura_imagem))
-
-    # Botão para confirmar a seleção
-    largura_botao = 200
-    altura_botao = 50
-    botao_confirmar = pygame.Rect(10, janela.get_height() - altura_botao - 10, largura_botao, altura_botao)
-    texto_botao = fonte.render('Confirmar Seleção', True, (255, 255, 255))
-
-    rodando = True
-
-    while rodando:
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                Fechar(message_queue)
-            if evento.type == pygame.MOUSEBUTTONDOWN:
-                mouseX, mouseY = pygame.mouse.get_pos()
-                if evento.button == 1:  # Botão esquerdo do mouse
-                    for idx, pos in enumerate(posicoes):
-                        if pos.collidepoint(mouseX, mouseY):
-                            carta_nome = todasCartas[idx]
-                            # Adicionar carta se ainda não houver 4 cartas selecionadas no total
-                            if len(cartas_selecionadas) < 9:
-                                if cartas_selecionadas.count(carta_nome) < 8:
-                                    cartas_selecionadas.append(carta_nome)
-                elif evento.button == 3:  # Botão direito do mouse
-                    for idx, pos in enumerate(posicoes):
-                        if pos.collidepoint(mouseX, mouseY):
-                            carta_nome = todasCartas[idx]
-                            # Remover carta se estiver presente na lista
-                            if carta_nome in cartas_selecionadas:
-                                cartas_selecionadas.remove(carta_nome)
-
-                # Verificar se o botão de confirmar seleção foi clicado
-                if botao_confirmar.collidepoint(mouseX, mouseY) and len(cartas_selecionadas) > 0:
-                    rodando = False
-
-        janela.fill((255, 255, 255))  # Cor de fundo branca
-
-        # Desenhar as imagens das cartas
-        for idx, nome in enumerate(todasCartas):
-            imagem = imagens_cartas[nome]
-            pos = posicoes[idx]
-            janela.blit(imagem, pos.topleft)
-            # Destacar as cartas selecionadas
-            count = cartas_selecionadas.count(nome)
-            if count > 0:
-                if count == 1:
-                    pygame.draw.rect(janela, (0, 0, 255), pos, 3)  # Borda azul para 1 carta
-                elif count == 2:
-                    pygame.draw.rect(janela, (255, 255, 0), pos, 3)  # Borda amarela para 2 cartas
-                elif count == 3:
-                    pygame.draw.rect(janela, (255, 0, 0), pos, 3)  # Borda vermelha para 3 cartas
-
-        # Desenhar o botão de confirmação
-        pygame.draw.rect(janela, (0, 0, 255), botao_confirmar)  # Botão azul
-        janela.blit(texto_botao, (botao_confirmar.x + 5, botao_confirmar.y + 10))
-
-        pygame.display.update()
-
-    return cartas_selecionadas
-
-
-def TelaMostrarCartasBaralho(janela, baralho, jogador, message_queue, response_queue):
-    fonte = pygame.font.SysFont('Arial', 20)
-    imagens_cartas = {}
-    posicoes = []
-    margem = 10
-    largura_imagem = 80
-    altura_imagem = 120
-    colunas = 5
-
-
-    for i, carta in enumerate(baralho['cartas']):
-        nome_imagem = carta['Imagem']
-        try:
-            imagem = pygame.image.load(f'cartas/{nome_imagem}.jpg')
-            imagem = pygame.transform.scale(imagem, (largura_imagem, altura_imagem))  # Reduzir o tamanho das imagens
-            imagens_cartas[nome_imagem] = imagem
-        except pygame.error:
-            q = 1
-
-    # Gerar posições para as imagens das cartas
-    for i in range(len(baralho['cartas'])):
-        x = margem + (i % colunas) * (largura_imagem + margem)
-        y = margem + (i // colunas) * (altura_imagem + margem)
-        posicoes.append(pygame.Rect(x, y, largura_imagem, altura_imagem))
-
-    # Botão de voltar
-    largura_botao_voltar = 200
-    altura_botao_voltar = 50
-    botao_voltar = pygame.Rect(10, janela.get_height() - altura_botao_voltar - 10, largura_botao_voltar,
-                               altura_botao_voltar)
-    texto_botao_voltar = fonte.render('Voltar', True, (255, 255, 255))
-
-    # Botão de excluir baralho
-    largura_botao_excluir = 200
-    altura_botao_excluir = 50
-    botao_excluir = pygame.Rect(janela.get_width() - largura_botao_excluir - 10,
-                                janela.get_height() - altura_botao_excluir - 10, largura_botao_excluir,
-                                altura_botao_excluir)
-    texto_botao_excluir = fonte.render('Excluir Baralho', True, (255, 255, 255))
-
-    rodando = True
-
-    while rodando:
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                Fechar(message_queue)
-            if evento.type == pygame.MOUSEBUTTONDOWN:
-                mouseX, mouseY = pygame.mouse.get_pos()
-
-                # Verificar se o botão de voltar foi clicado
-                if botao_voltar.collidepoint(mouseX, mouseY):
-                    rodando = False
-
-                # Verificar se o botão de excluir baralho foi clicado
-                if botao_excluir.collidepoint(mouseX, mouseY):
-                    if len(jogador["baralhos"]) > 1:
-                        jogador["baralhos"].remove(baralho)
-                        return  # Retorna para atualizar a lista de baralhos
-                    else:
-                        p = 1
-
-        janela.fill((255, 255, 255))  # Cor de fundo branca
-
-        # Desenhar as imagens das cartas
-        for i, carta in enumerate(baralho['cartas']):
-            nome_imagem = carta['Imagem']
-            imagem = imagens_cartas[nome_imagem]
-            pos = posicoes[i]
-            janela.blit(imagem, pos.topleft)
-
-        # Desenhar o botão de voltar
-        pygame.draw.rect(janela, (255, 0, 0), botao_voltar)  # Botão vermelho
-        janela.blit(texto_botao_voltar, (botao_voltar.x + 5, botao_voltar.y + 10))
-
-        # Desenhar o botão de excluir baralho
-        pygame.draw.rect(janela, (255, 0, 0), botao_excluir)  # Botão vermelho
-        janela.blit(texto_botao_excluir, (botao_excluir.x + 5, botao_excluir.y + 10))
-
-        pygame.display.update()
-
-def TelaMontarBaralhoJogador(janela, jogador, message_queue, response_queue):
-    fonte = pygame.font.SysFont('Arial', 30)
-    caixas_texto = []
-    # Função para atualizar a lista de baralhos
-    def atualizar_botoes():
-        caixas_texto.clear()
-        for i, baralho in enumerate(jogador["baralhos"]):
-            caixa = {
-                'rect': pygame.Rect(100, 100 + i * 60, 300, 50),
-                'texto': f'Mudar Baralho {baralho["nome"]}',
-                'baralho': baralho
-            }
-            caixas_texto.append(caixa)
-
-        # Adicionar botão para criar um novo baralho
-        nova_posicao = 100 + len(jogador["baralhos"]) * 60
-        caixa_novo = {
-            'rect': pygame.Rect(100, nova_posicao, 300, 50),
-            'texto': 'Criar Novo Baralho',
-            'baralho': None
-        }
-        caixas_texto.append(caixa_novo)
-
-    atualizar_botoes()  # Inicializa os botões
-
-    # Adicionar botão de voltar
-    largura_botao_voltar = 200
-    altura_botao_voltar = 50
-    botao_voltar = pygame.Rect(10, janela.get_height() - altura_botao_voltar - 10, largura_botao_voltar,
-                               altura_botao_voltar)
-    texto_botao_voltar = fonte.render('Voltar', True, (255, 255, 255))
-
-    rodando = True
-
-    while rodando:
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                Fechar(message_queue)
-            if evento.type == pygame.MOUSEBUTTONDOWN:
-                mouseX, mouseY = pygame.mouse.get_pos()
-                for caixa in caixas_texto:
-                    if caixa['rect'].collidepoint(mouseX, mouseY):
-                        if caixa['baralho']:
-                            # Mostrar as cartas do baralho selecionado
-                            TelaMostrarCartasBaralho(janela, caixa['baralho'], jogador)
-                            atualizar_botoes()  # Atualizar a lista de baralhos após a exclusão
-                        else:
-                            # Criar um novo baralho
-                            cartas_selecionadas = TelaSelecionarCartas(janela, jogador["todasCartas"])
-                            cartas_selecionadas = iniciaBaralho(cartas_selecionadas)
-                            if len(cartas_selecionadas) > 0:
-                                novo_baralho = {
-                                    "nome": f"Baralho {len(jogador['baralhos']) + 1}",
-                                    "cartas": [carta for carta in cartas_selecionadas]
-                                }
-                                jogador["baralhos"].append(novo_baralho)
-                                atualizar_botoes()  # Atualizar a lista de baralhos após a criação
-
-                # Verificar se o botão de voltar foi clicado
-                if botao_voltar.collidepoint(mouseX, mouseY):
-                    rodando = False
-
-        janela.fill((255, 255, 255))  # Cor de fundo branca
-
-        # Desenhar os botões dos baralhos existentes e o botão de criar novo baralho
-        for caixa in caixas_texto:
-            pygame.draw.rect(janela, (0, 0, 0), caixa['rect'], 2)
-            texto = fonte.render(caixa['texto'], True, (0, 0, 0))
-            janela.blit(texto, (caixa['rect'].x + 5, caixa['rect'].y + 5))
-
-        # Desenhar o botão de voltar
-        pygame.draw.rect(janela, (255, 0, 0), botao_voltar)  # Botão vermelho
-        janela.blit(texto_botao_voltar, (botao_voltar.x + 5, botao_voltar.y + 10))
-
-        pygame.display.update()
-
-def TelaVencedorFinal(janela, nome_vencedor, jogador1, jogador2, jogador3, message_queue, response_queue):
-    # Fonte para o texto do vencedor
-    fonte_vencedor = pygame.font.SysFont('Arial', 60)
-    fonte_botao = pygame.font.SysFont('Arial', 40)
+    fonte = pygame.font.Font(None, 36)
 
     while True:
-        janela.fill(BRANCO)
-        texto_vencedor = fonte_vencedor.render(f"Vencedor: {nome_vencedor}", True, PRETO)
-        janela.blit(texto_vencedor, (janela.get_width() // 2 - texto_vencedor.get_width() // 2, 150))
+        janela.blit(fundo, (0, 0))  # Desenhar a imagem de fundo
 
-        # Desenha o botão de voltar ao menu principal
-        botao_rect = pygame.Rect(janela.get_width() // 2 - 100, 300, 200, 60)
-        pygame.draw.rect(janela, PRETO, botao_rect)
-        texto_botao = fonte_botao.render("Voltar ao Menu", True, BRANCO)
-        janela.blit(texto_botao, (janela.get_width() // 2 - texto_botao.get_width() // 2, 315))
+        # Coordenadas das cartas
+        pos_x = MARGEM
+        pos_y = MARGEM
+
+        # Desenhar cartas na tela
+        for idx, imagem in enumerate(imagens_cartas):
+            rect = pygame.Rect(pos_x, pos_y, LARGURA_CARTA, ALTURA_CARTA)
+
+            # Define a cor da borda conforme a quantidade selecionada
+            if quantidade[idx] == 1:
+                cor_borda = VERDE
+            elif quantidade[idx] == 2:
+                cor_borda = AZUL
+            elif quantidade[idx] == 3:
+                cor_borda = VERMELHO
+            else:
+                cor_borda = BRANCO  # Sem seleção
+
+            janela.blit(pygame.transform.scale(imagem, (LARGURA_CARTA, ALTURA_CARTA)), rect)
+            pygame.draw.rect(janela, cor_borda, rect, 5)  # Borda das cartas
+
+            # Atualizar a posição das cartas
+            pos_x += LARGURA_CARTA + MARGEM
+            if (idx + 1) % 5 == 0:
+                pos_x = MARGEM
+                pos_y += ALTURA_CARTA + MARGEM
+
+        # Desenhar o botão "Voltar" se o limite de cartas for atingido
+        if total_selecionadas == LIMITE_CARTAS:
+            botao_voltar = pygame.Rect(largura_tela - LARGURA_BOTAO - MARGEM, altura_tela - ALTURA_BOTAO - MARGEM,
+                                       LARGURA_BOTAO, ALTURA_BOTAO)
+            pygame.draw.rect(janela, VERDE, botao_voltar)
+            texto_voltar = fonte.render('Confirmar', True, BRANCO)
+            janela.blit(texto_voltar, (botao_voltar.x + (LARGURA_BOTAO - texto_voltar.get_width()) // 2,
+                                       botao_voltar.y + (ALTURA_BOTAO - texto_voltar.get_height()) // 2))
 
         pygame.display.flip()
 
+        # Eventos
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                pos = pygame.mouse.get_pos()
+
+                if total_selecionadas == LIMITE_CARTAS:
+                    # Verificar se o botão "Voltar" foi clicado
+                    if botao_voltar.collidepoint(pos):
+                        return cartas_selecionadas
+
+                else:
+                    # Selecionar ou desmarcar cartas
+                    for idx, imagem in enumerate(imagens_cartas):
+                        rect = pygame.Rect(MARGEM + (idx % 5) * (LARGURA_CARTA + MARGEM),
+                                           MARGEM + (idx // 5) * (ALTURA_CARTA + MARGEM),
+                                           LARGURA_CARTA, ALTURA_CARTA)
+                        if rect.collidepoint(pos):
+                            carta = todasCartas[idx]
+                            if event.button == 1:  # Clique esquerdo
+                                if quantidade[idx] < 3 and total_selecionadas < LIMITE_CARTAS:
+                                    quantidade[idx] += 1
+                                    total_selecionadas += 1
+                                    cartas_selecionadas.append(carta)
+                            elif event.button == 3:  # Clique direito
+                                if quantidade[idx] > 0:
+                                    quantidade[idx] -= 1
+                                    total_selecionadas -= 1
+                                    cartas_selecionadas.remove(carta)
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    return cartas_selecionadas
+
+def TelaMostrarColecao(janela, todasCartas, imagemFundo):
+    pygame.init()
+    fonte = pygame.font.SysFont('Arial', 30)
+    largura_janela = janela.get_width()
+    altura_janela = janela.get_height()
+
+    largura_carta = 100
+    altura_carta = 150
+    margem = 20
+    colunas = 10
+    linhas = (len(todasCartas) + colunas - 1) // colunas  # Calcula o número de linhas necessárias
+    largura_botao = 250
+    altura_botao = 50
+
+    # Carregar e redimensionar a imagem de fundo
+    fundo = pygame.image.load(imagemFundo)
+    fundo = pygame.transform.scale(fundo, (largura_janela, altura_janela))
+
+    # Botão de voltar
+    botao_voltar = pygame.Rect(10, altura_janela - altura_botao - 10, largura_botao, altura_botao)
+    texto_voltar = fonte.render('Voltar', True, (255, 255, 255))
+
+    # Calcular a posição inicial das cartas para começar do topo
+    x_inicial = (largura_janela - (largura_carta * colunas + margem * (colunas - 1))) // 2
+    y_inicial = 20  # Ajusta a posição y para começar do topo
+
+    rodando_cartas = True
+    while rodando_cartas:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                Fechar(message_queue)
-            elif evento.type == pygame.MOUSEBUTTONDOWN:
-                if botao_rect.collidepoint(evento.pos):
-                    TelaMenuPrincipal(janela, jogador1, jogador2, jogador3)
+                pygame.quit()
+                sys.exit()
+            if evento.type == pygame.MOUSEBUTTONDOWN:
+                mouseX, mouseY = pygame.mouse.get_pos()
+                if botao_voltar.collidepoint(mouseX, mouseY):
+                    rodando_cartas = False
+                    return None  # Retorna para a tela anterior
 
+        # Desenhar a imagem de fundo
+        janela.blit(fundo, (0, 0))
 
-######################################################Lógica#########################################
+        # Desenhar as cartas
+        for i, path_imagem in enumerate(todasCartas):
+            imagem = pygame.image.load(path_imagem)
+            imagem_redimensionada = pygame.transform.scale(imagem, (largura_carta, altura_carta))
+            x = x_inicial + (i % colunas) * (largura_carta + margem)
+            y = y_inicial + (i // colunas) * (altura_carta + margem)
+            if y < altura_janela:  # Verifica se a carta está dentro da altura da janela
+                janela.blit(imagem_redimensionada, (x, y))
 
-def iniciaJogadores(jogador1, jogador2, jogador3):
-    jogadores = []
-    baralhos = []
+        # Desenhar o botão de voltar
+        pygame.draw.rect(janela, (255, 0, 0), botao_voltar)  # Botão vermelho
+        janela.blit(texto_voltar, (botao_voltar.x + 5, botao_voltar.y + 10))
 
-    jogadores.append(jogador1)
-    if(len(jogador1['baralhos']) == 0):
-        novoBaralho = iniciaBaralho(jogador1['todasCartas'])
-        jogador1["baralhos"].append({
-            "nome": "Baralho1",
-            "cartas": novoBaralho
-        })
-    baralhos.append(jogador1['baralhos'][0])
+        pygame.display.update()
 
-    jogadores.append(jogador2)
-    if (len(jogador2['baralhos']) == 0):
-        novoBaralho = iniciaBaralho(jogador2['todasCartas'])
-        jogador2["baralhos"].append({
-            "nome": "Baralho1",
-            "cartas": novoBaralho
-        })
-    baralhos.append(jogador2['baralhos'][0])
+def TelaMostrarDecks(janela, baralhos, nomeBaralhos, imagemFundo):
+    pygame.init()
+    fonte = pygame.font.SysFont('Arial', 30)
+    largura_janela = janela.get_width()
+    altura_janela = janela.get_height()
 
-    if (jogador3 != 0):
-        jogadores.append(jogador3)
-        if (len(jogador3['baralhos']) == 0):
-            novoBaralho = iniciaBaralho(jogador3['todasCartas'])
-            jogador3["baralhos"].append({
-                "nome": "Baralho1",
-                "cartas": novoBaralho
-            })
-        baralhos.append(jogador3['baralhos'][0])
+    largura_caixa = 300
+    altura_caixa = 50
 
-    return jogadores[0], jogadores[1], jogadores[2]
+    caixas_texto = [
+        {'rect': pygame.Rect(10, 100 + i * 60, largura_caixa, altura_caixa),
+         'texto': nomeBaralhos[i], 'index': i}
+        for i in range(len(nomeBaralhos))
+    ]
 
+    largura_botao_voltar = 200
+    altura_botao_voltar = 50
+    botao_voltar = pygame.Rect(10, altura_janela - altura_botao_voltar - 10, largura_botao_voltar, altura_botao_voltar)
+    texto_voltar = fonte.render('Voltar', True, (0, 0, 0))
+
+    # Carregar e redimensionar a imagem de fundo
+    fundo = pygame.image.load(imagemFundo)
+    fundo = pygame.transform.scale(fundo, (largura_janela, altura_janela))
+
+    rodando = True
+
+    while rodando:
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if evento.type == pygame.MOUSEBUTTONDOWN:
+                mouseX, mouseY = pygame.mouse.get_pos()
+                if botao_voltar.collidepoint(mouseX, mouseY):
+                    rodando = False
+                    return None
+
+                for caixa in caixas_texto:
+                    if caixa['rect'].collidepoint(mouseX, mouseY):
+                        index = caixa['index']
+                        acao_deck = TelaMostrarCartasBaralho(janela, baralhos[index], index, imagemFundo)
+                        if acao_deck is not None:
+                            return acao_deck
+
+        # Desenhar a imagem de fundo
+        janela.blit(fundo, (0, 0))
+
+        for caixa in caixas_texto:
+            pygame.draw.rect(janela, (255, 255, 255), caixa['rect'])  # Fundo branco
+            pygame.draw.rect(janela, (0, 0, 0), caixa['rect'], 2)  # Borda preta
+            texto = fonte.render(caixa['texto'], True, (0, 0, 0))  # Texto preto
+            janela.blit(texto, (caixa['rect'].x + 5, caixa['rect'].y + 5))
+
+        pygame.draw.rect(janela, (200, 200, 200), botao_voltar)  # Botão cinza
+        janela.blit(texto_voltar, (botao_voltar.x + 5, botao_voltar.y + 10))
+
+        pygame.display.update()
+
+def TelaMostrarCartasBaralho(janela, baralho, index_baralho, imagemFundo):
+    pygame.init()
+    fonte = pygame.font.SysFont('Arial', 30)
+    largura_janela = janela.get_width()
+    altura_janela = janela.get_height()
+
+    largura_carta = 150  # Aumente a largura das cartas
+    altura_carta = 200  # Aumente a altura das cartas
+    margem = 20  # Ajuste a margem para maior espaçamento
+    colunas = 3
+    linhas = 3
+
+    largura_total = largura_carta * colunas + margem * (colunas - 1)
+    altura_total = altura_carta * linhas + margem * (linhas - 1)
+    x_inicial = (largura_janela - largura_total) // 2
+    y_inicial = (altura_janela - altura_total) // 2
+
+    largura_botao = 250
+    altura_botao = 50
+    botao_ativo = pygame.Rect(10, altura_janela - 120, largura_botao, altura_botao)
+    botao_voltar = pygame.Rect(10, altura_janela - 60, largura_botao, altura_botao)
+
+    if index_baralho != 0:
+        botao_deletar = pygame.Rect(10, altura_janela - 180, largura_botao, altura_botao)
+        texto_deletar = fonte.render('Deletar Deck', True, (255, 255, 255))
+    else:
+        botao_deletar = None
+        texto_deletar = None
+
+    texto_ativo = fonte.render('Escolher Deck Ativo', True, (255, 255, 255))
+    texto_voltar = fonte.render('Voltar', True, (255, 255, 255))
+
+    # Carregar e redimensionar a imagem de fundo
+    fundo = pygame.image.load(imagemFundo)
+    fundo = pygame.transform.scale(fundo, (largura_janela, altura_janela))
+
+    rodando_cartas = True
+    while rodando_cartas:
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if evento.type == pygame.MOUSEBUTTONDOWN:
+                mouseX, mouseY = pygame.mouse.get_pos()
+                if botao_voltar.collidepoint(mouseX, mouseY):
+                    rodando_cartas = False
+                    return 2, None  # Retorna 2 ao clicar no botão "Voltar"
+                if botao_deletar and botao_deletar.collidepoint(mouseX, mouseY):
+                    rodando_cartas = False
+                    return 0, baralho  # Retorna 0 e o baralho para deletar
+                if botao_ativo.collidepoint(mouseX, mouseY):
+                    rodando_cartas = False
+                    return 1, baralho  # Retorna 1 e o baralho para ativar
+
+        # Desenhar a imagem de fundo
+        janela.blit(fundo, (0, 0))
+
+        for i, path_imagem in enumerate(baralho):
+            imagem = pygame.image.load(path_imagem)
+            imagem_redimensionada = pygame.transform.scale(imagem, (largura_carta, altura_carta))
+            x = x_inicial + (i % colunas) * (largura_carta + margem)
+            y = y_inicial + (i // colunas) * (altura_carta + margem)
+            janela.blit(imagem_redimensionada, (x, y))
+
+        if botao_deletar:
+            pygame.draw.rect(janela, (255, 0, 0), botao_deletar)  # Botão vermelho
+            janela.blit(texto_deletar, (botao_deletar.x + 5, botao_deletar.y + 10))
+
+        pygame.draw.rect(janela, (0, 0, 255), botao_ativo)  # Botão azul
+        pygame.draw.rect(janela, (200, 200, 200), botao_voltar)  # Botão cinza
+
+        janela.blit(texto_ativo, (botao_ativo.x + 5, botao_ativo.y + 10))
+        janela.blit(texto_voltar, (botao_voltar.x + 5, botao_voltar.y + 10))
+
+        pygame.display.update()
 
 def iniciaJanela(largura_janela, altura_janela):
     janela = pygame.display.set_mode((largura_janela, altura_janela))
     pygame.display.set_caption('Jogo de Cartas')
     return janela
 
-def escolherBaralhosJogadores(jogador, janela):
-    baralho = TelaEscolherBaralho(janela, jogador)
-    return baralho
 
 
-def mostraCarta(janela, carta, posX, posY):
-    alt = 150
-    larg = 100
-    carta_img = pygame.transform.scale(pygame.image.load(carta['imagem']), (alt, larg))
-    carta_rect = carta_img.get_rect(topleft=(posX, posY))
-    janela.blit(carta_img, carta_rect)
-    return carta_rect
 
-
-def iniciaBaralho(cartas_strings):
-
-    cartas = []
-    padrao = re.compile(r'(\d+)_(\d+)_(\d+)_([a-zA-Z]+)_([a-zA-Z]+)_([a-zA-Z]+)')
-
-    for i in range(len(cartas_strings)):
-        carta_string = cartas_strings[i]
-        correspondencia = padrao.match(carta_string)
-        if correspondencia:
-            atributos = correspondencia.groups()
-            carta = {
-                'Forca': int(atributos[0]),
-                'Fofura': int(atributos[1]),
-                'Velocidade': int(atributos[2]),
-                'Tamanho': atributos[3],
-                'Idade': atributos[4],
-                'Tipo': atributos[5],
-                'Imagem': carta_string
-            }
-            cartas.append(carta)
-
-    return cartas
-
-def comprarCartas(mao, baralho):
-    # Embaralha o baralho
-    try:
-        random.shuffle(baralho)
-    except:
-        a = 1
-
-    num_cartas = 3
-    if(len(baralho) < 3):
-        num_cartas = len(baralho)
-
-
-    # Adiciona cartas à mão conforme disponível no baralho
-    for _ in range(num_cartas):
-        if baralho:  # Verifica se o baralho não está vazio
-            mao.append(baralho.pop())  # Remove a última carta e adiciona à mão
-
-    return mao, baralho
-
-def Jogar(janela, jogadores, Mao1, Mao2, Mao3, turno):
-    ordem_tamanho = ['minusculo', 'pequeno', 'medio', 'grande', 'enorme']
-    ordem_idade = ['jovem', 'adolescente', 'adulto', 'anciao']
-    ordem_tipo = ['aquatico', 'voador', 'terrestre']
-
-    # Inicialização da fonte
-    pygame.font.init()
-    fonte_jogador = pygame.font.SysFont('Arial', 40)
-
-    # Cria uma lista de mãos para facilitar o acesso por índice
-    Maos = [Mao1, Mao2, Mao3]
-    cartas_vencedoras = []
-
-    JogadorAleatorio = random.randint(0, 2)
-    nome_jogador_aleatorio = jogadores[JogadorAleatorio]['nome']
-    mao_jogadorAleatorio = Maos[JogadorAleatorio]
-
-    # Exibir texto com o nome do jogador
-    texto_jogador = fonte_jogador.render(f"Vez do Jogador: {nome_jogador_aleatorio} no Turno {turno}", True, (0, 0, 0))
-    janela.blit(texto_jogador, (50, 10))
-
-    carta_escolhida_aleatoria = TelaEscolherCarta(janela, mao_jogadorAleatorio, nome_jogador_aleatorio, turno)
-    Maos[JogadorAleatorio].remove(carta_escolhida_aleatoria)
-    cartas_vencedoras.append(carta_escolhida_aleatoria)
-
-    atributo_escolhido = TelaEscolherAtributo(janela, ['Forca', 'Fofura', 'Velocidade', 'Tamanho', 'Idade', 'Tipo'], turno)
-
-    # Mapeamento dos atributos
-    if atributo_escolhido == 'Tamanho':
-        valor_atributo_aleatorio = ordem_tamanho.index(carta_escolhida_aleatoria[atributo_escolhido])
-    elif atributo_escolhido == 'Idade':
-        valor_atributo_aleatorio = ordem_idade.index(carta_escolhida_aleatoria[atributo_escolhido])
-    elif atributo_escolhido == 'Tipo':
-        valor_atributo_aleatorio = ordem_tipo.index(carta_escolhida_aleatoria[atributo_escolhido])
-    else:
-        valor_atributo_aleatorio = carta_escolhida_aleatoria[atributo_escolhido]
-
-
-    valores_atributos = [valor_atributo_aleatorio]
-    cartas_escolhidas = [carta_escolhida_aleatoria]
-    indices_jogadores = [JogadorAleatorio]
-
-    for i in range(3):
-        if i == JogadorAleatorio:
-            continue
-        nome_jogador = jogadores[i]['nome']
-        mao_jogadorOutro = Maos[i]
-        carta_escolhida = TelaEscolherCarta(janela, mao_jogadorOutro, nome_jogador, turno, atributo_escolhido)
-        if carta_escolhida:
-            if atributo_escolhido == 'Tamanho':
-                valor_atributo_outro = ordem_tamanho.index(carta_escolhida[atributo_escolhido])
-            elif atributo_escolhido == 'Idade':
-                valor_atributo_outro = ordem_idade.index(carta_escolhida[atributo_escolhido])
-            elif atributo_escolhido == 'Tipo':
-                valor_atributo_outro = ordem_tipo.index(carta_escolhida_aleatoria[atributo_escolhido])
-            else:
-                valor_atributo_outro = carta_escolhida[atributo_escolhido]
-
-            valores_atributos.append(valor_atributo_outro)
-            cartas_escolhidas.append(carta_escolhida)
-            indices_jogadores.append(i)
-            Maos[i].remove(carta_escolhida)
-            cartas_vencedoras.append(carta_escolhida)
-
-    max_valor = max(valores_atributos)
-    vencedores = [i for i, valor in enumerate(valores_atributos) if valor == max_valor]
-    vencedor_aleatorio = random.choice(vencedores)
-    jogador_vencedor_index = indices_jogadores[vencedor_aleatorio]
-    jogador_vencedor = jogadores[jogador_vencedor_index]
-
-
-    # Adicionar todas as cartas vencedoras à mão do jogador vencedor
-    Maos[jogador_vencedor_index].extend(cartas_vencedoras)
-
-    return jogador_vencedor['nome'], Mao1, Mao2, Mao3
-
-def JogoPrincipal(janela, jogadores):
-    Baralhos = []  # Lista para armazenar todos os baralhos escolhidos
-    Mao1 = []
-    Mao2 = []
-    Mao3 = []
-
-    # Jogar turno para cada jogador na ordem
-    for jogador in jogadores:
-        baralho = escolherBaralhosJogadores(jogador, janela)
-        Baralhos.append(baralho)
-
-    turno = 0
-    while True:
-
-
-        # Adiciona cartas para os jogadores e atualiza os baralhos
-        Mao1, Baralhos[0]['cartas'] = comprarCartas(Mao1, Baralhos[0]['cartas'])
-        Mao2, Baralhos[1]['cartas'] = comprarCartas(Mao2, Baralhos[1]['cartas'])
-        Mao3, Baralhos[2]['cartas'] = comprarCartas(Mao3, Baralhos[2]['cartas'])
-
-        turno += 1
-        jogador_vencedor, Mao1, Mao2, Mao3 = Jogar(janela, jogadores, Mao1, Mao2, Mao3, turno)
-
-        # Adiciona as cartas das mãos ao baralho e limpa as mãos
-        Baralhos[0]['cartas'].extend(Mao1)
-        Baralhos[1]['cartas'].extend(Mao2)
-        Baralhos[2]['cartas'].extend(Mao3)
-
-        Mao1.clear()
-        Mao2.clear()
-        Mao3.clear()
-
-        TelaVencedor(janela, jogador_vencedor, turno)
-
-    # Determina o jogador com mais cartas e declara-o vencedor
-    num_cartas = [len(baralho['cartas']) for baralho in Baralhos]
-    vencedor_index = num_cartas.index(max(num_cartas))
-    jogador_vencedor_final = jogadores[vencedor_index]
-
-    # Tela de vencedor final
-    TelaVencedorFinal(janela, jogador_vencedor_final['nome'], jogadores[0], jogadores[1], jogadores[2])
-
-    pygame.quit()
-    sys.exit()
 
 
 

@@ -1,276 +1,70 @@
-from telas import iniciaJanela, TelaLogin, TelaMenuPrincipal
+from telas import iniciaJanela, TelaLogin, TelaMenuPrincipal, TelaMudarBaralho
+from telas import TelaCarregamento, TelaPartida, TelaSelecaoAtributo, TelaVencedor
+from telas import TelaMostrarDecks, TelaMostrarColecao, TelaCriarDeck
+import pygame
 
-jogador1 = {
-    "nome": "Jogador1",
-    "baralhos": [
-        {
-            "nome": "Baralho1",
-            "cartas": [{
-                "Forca": 1,
-                "Fofura": 2,
-                "Velocidade": 5,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "terrestre",
-                "Imagem": "1_2_5_enorme_anciao_terrestre"
-            },{
-                "Forca": 1,
-                "Fofura": 2,
-                "Velocidade": 5,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "terrestre",
-                "Imagem": "1_2_5_enorme_anciao_terrestre"
-            },
-                {
-                "Forca": 1,
-                "Fofura": 2,
-                "Velocidade": 5,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "terrestre",
-                "Imagem": "1_2_5_enorme_anciao_terrestre"
-            }, {
-                "Forca": 1,
-                "Fofura": 5,
-                "Velocidade": 9,
-                "Tamanho": "medio",
-                "Idade": "adulto",
-                "Tipo": "voador",
-                "Imagem": "1_5_9_medio_adulto_voador"
-            },
-                {
-                    "Forca": 2,
-                    "Fofura": 5,
-                    "Velocidade": 6,
-                    "Tamanho": "minusculo",
-                    "Idade": "anciao",
-                    "Tipo": "voador",
-                    "Imagem": "2_5_6_minusculo_anciao_voador"
-                },{
-                "Forca": 1,
-                "Fofura": 2,
-                "Velocidade": 5,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "terrestre",
-                "Imagem": "1_2_5_enorme_anciao_terrestre"
-            },
-                {
-                "Forca": 1,
-                "Fofura": 2,
-                "Velocidade": 5,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "terrestre",
-                "Imagem": "1_2_5_enorme_anciao_terrestre"
-            }, {
-                "Forca": 1,
-                "Fofura": 5,
-                "Velocidade": 9,
-                "Tamanho": "medio",
-                "Idade": "adulto",
-                "Tipo": "voador",
-                "Imagem": "1_5_9_medio_adulto_voador"
-            },
-                {
-                    "Forca": 2,
-                    "Fofura": 5,
-                    "Velocidade": 6,
-                    "Tamanho": "minusculo",
-                    "Idade": "anciao",
-                    "Tipo": "voador",
-                    "Imagem": "2_5_6_minusculo_anciao_voador"
-                }]
-        },
-        {
-            "nome": "Baralho2",
-            "cartas": [{
-                "Forca": 3,
-                "Fofura": 7,
-                "Velocidade": 8,
-                "Tamanho": "grande",
-                "Idade": "adolescente",
-                "Tipo": "terrestre",
-                "Imagem": "3_7_8_grande_adolescente_aquatico"
-            },{
-                "Forca": 1,
-                "Fofura": 2,
-                "Velocidade": 5,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "terrestre",
-                "Imagem": "1_2_5_enorme_anciao_terrestre"
-            }, {
-                "Forca": 1,
-                "Fofura": 5,
-                "Velocidade": 9,
-                "Tamanho": "medio",
-                "Idade": "adulto",
-                "Tipo": "voador",
-                "Imagem": "1_5_9_medio_adulto_voador"
-            },
-                {
-                    "Forca": 8,
-                    "Fofura": 7,
-                    "Velocidade": 1,
-                    "Tamanho": "medio",
-                    "Idade": "jovem",
-                    "Tipo": "aquatico",
-                    "Imagem": "8_7_1_medio_jovem_aquatico"
-                }]
-        }
-    ],
-    "todasCartas": ['1_2_5_enorme_anciao_terrestre', '1_5_9_medio_adulto_voador', '2_3_10_pequeno_jovem_terrestre',
-                    '2_5_6_minusculo_anciao_voador']
+baralho1 = ['server/StreamingAssets/aranha.png', 'server/StreamingAssets/bem_te_vi.png','server/StreamingAssets/borboleta.png', 'server/StreamingAssets/aranha.png', 'server/StreamingAssets/bem_te_vi.png','server/StreamingAssets/borboleta.png', 'server/StreamingAssets/aranha.png', 'server/StreamingAssets/bem_te_vi.png','server/StreamingAssets/borboleta.png']
+baralho2 = ['server/StreamingAssets/calopsita.png', 'server/StreamingAssets/cobra_de_vidro.png','server/StreamingAssets/coruja.png']
+baralho3 = ['server/StreamingAssets/coruja.png', 'server/StreamingAssets/grilo.png','server/StreamingAssets/lagartixa.png']
+baralhos = [baralho1, baralho2, baralho3]
+todasCartas = ['server/StreamingAssets/aranha.png', 'server/StreamingAssets/bem_te_vi.png','server/StreamingAssets/borboleta.png', 'server/StreamingAssets/aranha.png', 'server/StreamingAssets/bem_te_vi.png','server/StreamingAssets/borboleta.png', 'server/StreamingAssets/aranha.png', 'server/StreamingAssets/bem_te_vi.png','server/StreamingAssets/borboleta.png', 'server/StreamingAssets/coruja.png', 'server/StreamingAssets/grilo.png','server/StreamingAssets/lagartixa.png']
+nomeBaralhos = ['AAA', 'BBB', 'CCC']
+NomeJogadore ='Marcus'
 
-}
-
-jogador2 = {
-    "nome": "Jogador2",
-    "baralhos": [
-        {
-            "nome": "Baralho1",
-            "cartas": [{
-                "Forca": 8,
-                "Fofura": 7,
-                "Velocidade": 1,
-                "Tamanho": "medio",
-                "Idade": "jovem",
-                "Tipo": "aquatico",
-                "Imagem": "8_7_1_medio_jovem_aquatico"
-            },{
-                "Forca": 8,
-                "Fofura": 7,
-                "Velocidade": 1,
-                "Tamanho": "medio",
-                "Idade": "jovem",
-                "Tipo": "aquatico",
-                "Imagem": "8_7_1_medio_jovem_aquatico"
-            },{
-                "Forca": 1,
-                "Fofura": 2,
-                "Velocidade": 5,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "terrestre",
-                "Imagem": "1_2_5_enorme_anciao_terrestre"
-            }, {
-                "Forca": 9,
-                "Fofura": 4,
-                "Velocidade": 1,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "aquatico",
-                "Imagem": "8_7_1_medio_jovem_aquatico"
-            },
-                {
-                    "Forca": 2,
-                    "Fofura": 5,
-                    "Velocidade": 6,
-                    "Tamanho": "minusculo",
-                    "Idade": "anciao",
-                    "Tipo": "voador",
-                    "Imagem": "2_5_6_minusculo_anciao_voador"
-                },{
-                "Forca": 8,
-                "Fofura": 7,
-                "Velocidade": 1,
-                "Tamanho": "medio",
-                "Idade": "jovem",
-                "Tipo": "aquatico",
-                "Imagem": "8_7_1_medio_jovem_aquatico"
-            },{
-                "Forca": 1,
-                "Fofura": 2,
-                "Velocidade": 5,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "terrestre",
-                "Imagem": "1_2_5_enorme_anciao_terrestre"
-            }, {
-                "Forca": 9,
-                "Fofura": 4,
-                "Velocidade": 1,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "aquatico",
-                "Imagem": "8_7_1_medio_jovem_aquatico"
-            },
-                {
-                    "Forca": 2,
-                    "Fofura": 5,
-                    "Velocidade": 6,
-                    "Tamanho": "minusculo",
-                    "Idade": "anciao",
-                    "Tipo": "voador",
-                    "Imagem": "2_5_6_minusculo_anciao_voador"
-                }]
-        },
-        {
-            "nome": "Baralho2",
-            "cartas": [{
-                "Forca": 3,
-                "Fofura": 7,
-                "Velocidade": 8,
-                "Tamanho": "grande",
-                "Idade": "adolescente",
-                "Tipo": "terrestre",
-                "Imagem": "3_7_8_grande_adolescente_aquatico"
-            },{
-                "Forca": 1,
-                "Fofura": 2,
-                "Velocidade": 5,
-                "Tamanho": "enorme",
-                "Idade": "anciao",
-                "Tipo": "terrestre",
-                "Imagem": "1_2_5_enorme_anciao_terrestre"
-            }, {
-                "Forca": 10,
-                "Fofura": 2,
-                "Velocidade": 6,
-                "Tamanho": "medio",
-                "Idade": "adolescente",
-                "Tipo": "voador",
-                "Imagem": "10_2_6_medio_adolescente_voador"
-            },
-                {
-                    "Forca": 3,
-                    "Fofura": 7,
-                    "Velocidade": 8,
-                    "Tamanho": "grande",
-                    "Idade": "adolescente",
-                    "Tipo": "aquatico",
-                    "Imagem": "3_7_8_grande_adolescente_aquatico"
-                }]
-        }
-    ],
-    "todasCartas": ['1_2_5_enorme_anciao_terrestre', '1_5_9_medio_adulto_voador', '2_3_10_pequeno_jovem_terrestre',
-                    '2_5_6_minusculo_anciao_voador']
-}
-
-jogador3 = {
-    "nome": "Jogador3",
-    "baralhos": [
-    ],
-    "todasCartas": ['1_2_5_enorme_anciao_terrestre', '1_5_9_medio_adulto_voador', '2_3_10_pequeno_jovem_terrestre',
-                    '2_5_6_minusculo_anciao_voador','1_2_5_enorme_anciao_terrestre', '1_5_9_medio_adulto_voador', '2_3_10_pequeno_jovem_terrestre',
-                    '2_5_6_minusculo_anciao_voador','2_5_6_minusculo_anciao_voador']
-}
-
+imagemPantano = 'server/StreamingAssets/pantano.jpg'
+imagemCerrado = 'server/StreamingAssets/cerrado.jpg'
+pathImagemLogin = 'server/StreamingAssets/imagemLogin.jpg'
+pathImagemTelaPrincipal = 'server/StreamingAssets/imagemTelaPrincipal.jpg'
 def startInterface(message_queue, response_queue):
-    cartas = 0
     janela = iniciaJanela(1200, 800)
-
+    resposta = 1
     while True:
-        nome, senha = TelaLogin(janela, message_queue, response_queue)
-        message_queue.put(f"login {nome} {senha}")
-        resposta = response_queue.get()
-        if(resposta == "logging in"):
-            TelaMenuPrincipal(janela, jogador1, jogador2, jogador3, message_queue, response_queue)
+        #retorna 0 se login e 1 se registrar
+        #nome, senha, reposta = TelaLogin(janela, message_queue, response_queue, pathImagemLogin)
+        #message_queue.put(f"login {nome} {senha}")
+        #resposta = response_queue.get()
+        if(resposta == 1):
+
+            #retorna 0 se for para sair, 1 se for para ir para opções de baralho e 2 se for para jogar
+            saidaTelaMenuPrincipal = TelaMenuPrincipal(janela, message_queue, response_queue, pathImagemTelaPrincipal)
+            if(saidaTelaMenuPrincipal == 0):
+                break
+            #ramo de mudar o baralho
+            if(saidaTelaMenuPrincipal == 1):
+                #0 = ver decks TelaMostrarDecks (aqui que deleta deck e marca que está usando)
+                #1 = ver coleção TelaMostrarCartasBaralho
+                #2 = criar deck TelaCriarDeck
+                #3 = voltar ao menu
+                TelaMudarBaralho(janela, message_queue, response_queue, imagemCerrado)
+
+                #precisa como entrada a coleção de baralhos, onde cada baralho é composto pelo caminho das imagens das cartas
+                #nome dos baralho é literalmente o nome de todos os baralhos
+                #vai mostrar todos os decks do usuario, depois de ele escolher 1
+                #chama a função TelaMostrarCartasBaralho
+                # que vai retornar 0 e o baralho caso o usuario escolha deletar
+                # Retornar 1 e o baralho quando "Escolher Deck Ativo" for clicado.
+                # retorna 2 se o usuario clicar em voltar e none
+                TelaMostrarDecks(janela, baralhos, nomeBaralhos,imagemCerrado )
+
+                #só mostra todas as cartas e tem um botão que volta
+                TelaMostrarColecao(janela, todasCartas, imagemCerrado)
+
+                TelaCriarDeck(janela, todasCartas, imagemCerrado)
+            else:
+                #TelaCarregamento(janela, pathImagemTelaPrincipal)
+
+                #retorna a carta escolhida, e o baralho3 é o caminho das 3 cartas do usuário
+                TelaPartida(janela, baralho3, 0, imagemPantano)
+
+                #retorna o atributo escolhido
+                TelaSelecaoAtributo(janela, imagemPantano)
+
+                # se jogo_completo for True aparece que o jogador ganhou o jogo
+                # se for false aparece que ele ganhou o turno
+                TelaVencedor(janela, "Marcus", 1, True, imagemPantano)
         else:
-            # mostrar pop-up ou escrever na tela o erro (provavelmente vai ta na 'resposta')
             continue
+
 
 if __name__ == "__main__":
     startInterface()
