@@ -600,6 +600,14 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
     nome_deck = ""
     caixa_texto_ativa = False
 
+    #add botão voltar
+    largura_botao_voltar = 200
+    altura_botao_voltar = 50
+    botao_voltar = pygame.Rect((largura_tela - largura_botao_voltar + 250) // 2,
+                               altura_tela - altura_botao_voltar - 20,
+                               largura_botao_voltar, altura_botao_voltar)
+    texto_botao_voltar = fonte.render('Voltar ao Menu', True, (0, 0, 0))  # Texto preto
+
     while True:
         janela.blit(fundo, (0, 0))  # Desenhar a imagem de fundo
 
@@ -650,8 +658,13 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
             janela.blit(texto_confirmar, (botao_confirmar.x + (LARGURA_BOTAO - texto_confirmar.get_width()) // 2,
                                           botao_confirmar.y + (ALTURA_BOTAO - texto_confirmar.get_height()) // 2))
 
+        pygame.draw.rect(janela, (255, 255, 255), botao_voltar)  # Fundo branco
+        pygame.draw.rect(janela, (255, 0, 0), botao_voltar, 2)  # Borda vermelha
+        janela.blit(texto_botao_voltar, (botao_voltar.x + 5, botao_voltar.y + 10))
+
         pygame.display.flip()
 
+        
         # Eventos
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -659,11 +672,16 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
+                mouseX = pos[0]
+                mouseY = pos[1]
 
                 if caixa_texto_rect.collidepoint(pos):
                     caixa_texto_ativa = True
                 else:
                     caixa_texto_ativa = False
+                    
+                if botao_voltar.collidepoint(mouseX, mouseY):
+                    return 3  # Retorna 3 quando o botão de voltar é clicado
 
                 if total_selecionadas == LIMITE_CARTAS and len(nome_deck) > 0:
                     # Verificar se o botão "Confirmar" foi clicado
@@ -711,6 +729,8 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
                         nome_deck = nome_deck[:-1]
                     else:
                         nome_deck += event.unicode
+            
+
 
 def TelaMostrarColecao(janela, todasCartas, imagemFundo, message_queue, response_queue):
     pygame.init()

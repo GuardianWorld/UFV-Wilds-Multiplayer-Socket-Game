@@ -376,7 +376,11 @@ def client_handler(client_socket):
                     message_flag = True
                     # message = input("Enter a message: ")
                     message = message_queue.get()
-                    print(message)
+                    #if login do not print
+                    if(message.split(' ', 1)[0] == "login"):
+                        print(f"[*] login")
+                    else:
+                        print(message)
             else:
                 if(on_match):
                     match_handler(client_socket)
@@ -582,7 +586,7 @@ def login_operation(client_socket):
             # print(f"[*] There exists {len(server_files)} files.")
             amount, missing_indexes = verify_files(server_files)
             if(amount == 0):
-                # print("[*] All files are up to date.")
+                print("[*] All files are up to date.")
                 break
             else:
                 # print(f"[*] Missing {amount} files.")

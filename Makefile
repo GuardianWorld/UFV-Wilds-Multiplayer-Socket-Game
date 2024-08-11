@@ -1,4 +1,4 @@
-.PHONY: venv install server_install server client_install client
+.PHONY: venv install server client run
 
 PYTHON_CMD := python
 
