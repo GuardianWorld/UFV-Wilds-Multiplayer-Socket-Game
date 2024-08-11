@@ -560,6 +560,7 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
     AZUL = (0, 0, 255)
     VERMELHO = (255, 0, 0)
     CINZA = (169, 169, 169)
+    PRETO = (0, 0, 0)
 
     largura_tela = janela.get_width()
     altura_tela = janela.get_height()
@@ -574,7 +575,7 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
     
     # Recupera o caminho para as imagens das cartas
     paths = []
-    for nome in todasCartas[:,0]:
+    for nome in todasCartas[:, 0]:
         message_queue.put(f"check_card {nome}")
         paths.append(response_queue.get()[7])
     
@@ -587,6 +588,11 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
     cartas_selecionadas = []
 
     fonte = pygame.font.Font(None, 36)
+    fonte_caixa_texto = pygame.font.Font(None, 48)
+
+    # Variáveis para o nome do deck
+    nome_deck = ""
+    caixa_texto_ativa = False
 
     while True:
         janela.blit(fundo, (0, 0))  # Desenhar a imagem de fundo
@@ -618,14 +624,25 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
                 pos_x = MARGEM
                 pos_y += ALTURA_CARTA + MARGEM
 
-        # Desenhar o botão "Voltar" se o limite de cartas for atingido
-        if total_selecionadas == LIMITE_CARTAS:
-            botao_voltar = pygame.Rect(largura_tela - LARGURA_BOTAO - MARGEM, altura_tela - ALTURA_BOTAO - MARGEM,
+        # Desenhar o texto "NOME DO DECK:"
+        texto_nome_label = fonte.render('NOME DO DECK:', True, BRANCO)
+        janela.blit(texto_nome_label, (MARGEM, altura_tela - ALTURA_BOTAO - 4 * MARGEM))
+
+        # Desenhar caixa de texto para o nome do deck
+        caixa_texto_rect = pygame.Rect(MARGEM, altura_tela - ALTURA_BOTAO - 2 * MARGEM, largura_tela // 2, ALTURA_BOTAO)
+        pygame.draw.rect(janela, BRANCO, caixa_texto_rect, 2)
+
+        texto_nome_deck = fonte_caixa_texto.render(nome_deck, True, BRANCO)
+        janela.blit(texto_nome_deck, (caixa_texto_rect.x + 5, caixa_texto_rect.y + 5))
+
+        # Desenhar o botão "Confirmar" se o limite de cartas for atingido e o nome do deck não estiver vazio
+        if total_selecionadas == LIMITE_CARTAS and len(nome_deck) > 0:
+            botao_confirmar = pygame.Rect(largura_tela - LARGURA_BOTAO - MARGEM, altura_tela - ALTURA_BOTAO - MARGEM,
                                        LARGURA_BOTAO, ALTURA_BOTAO)
-            pygame.draw.rect(janela, VERDE, botao_voltar)
-            texto_voltar = fonte.render('Confirmar', True, BRANCO)
-            janela.blit(texto_voltar, (botao_voltar.x + (LARGURA_BOTAO - texto_voltar.get_width()) // 2,
-                                       botao_voltar.y + (ALTURA_BOTAO - texto_voltar.get_height()) // 2))
+            pygame.draw.rect(janela, VERDE, botao_confirmar)
+            texto_confirmar = fonte.render('Confirmar', True, BRANCO)
+            janela.blit(texto_confirmar, (botao_confirmar.x + (LARGURA_BOTAO - texto_confirmar.get_width()) // 2,
+                                          botao_confirmar.y + (ALTURA_BOTAO - texto_confirmar.get_height()) // 2))
 
         pygame.display.flip()
 
@@ -637,22 +654,27 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
             if event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
 
-                if total_selecionadas == LIMITE_CARTAS:
-                    # Verificar se o botão "Voltar" foi clicado
-                    if botao_voltar.collidepoint(pos):
-                        message_queue.put(f"create_deck {'nomedodeck'}")
+                if caixa_texto_rect.collidepoint(pos):
+                    caixa_texto_ativa = True
+                else:
+                    caixa_texto_ativa = False
+
+                if total_selecionadas == LIMITE_CARTAS and len(nome_deck) > 0:
+                    # Verificar se o botão "Confirmar" foi clicado
+                    if botao_confirmar.collidepoint(pos):
+                        message_queue.put(f"create_deck {nome_deck}")
                         resposta, nome_deck = response_queue.get()
-                        if(resposta == "Deck created"):
+                        if resposta == "Deck created":
                             for i in range(9):
                                 message_queue.put(f"add_card_to_deck {nome_deck} {cartas_selecionadas[i]}")
-                                if(response_queue.get() == "Card added"):
+                                if response_queue.get() == "Card added":
                                     continue
                                 else:
-                                    # erro, mostrar um popup ou algm coisa assim
+                                    # erro, mostrar um popup ou algo assim
                                     break
                         else:
                             True
-                            # erro, mostrar um popup ou algm coisa assim
+                            # erro, mostrar um popup ou algo assim
                         return
 
                 else:
@@ -675,8 +697,14 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
                                     cartas_selecionadas.remove(carta)
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    return None
+                if caixa_texto_ativa:
+                    if event.key == pygame.K_RETURN:
+                        if total_selecionadas == LIMITE_CARTAS and len(nome_deck) > 0:
+                            return cartas_selecionadas, nome_deck
+                    elif event.key == pygame.K_BACKSPACE:
+                        nome_deck = nome_deck[:-1]
+                    else:
+                        nome_deck += event.unicode
 
 def TelaMostrarColecao(janela, todasCartas, imagemFundo, message_queue, response_queue):
     pygame.init()
