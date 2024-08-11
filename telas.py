@@ -196,7 +196,6 @@ def TelaCarregamento(janela, pathImagemTelaPrincipal, message_queue, response_qu
 
     message_queue.put("match_search")
     resposta = response_queue.get()
-    print(resposta)
 
     while True:
         janela.blit(imagem_fundo, (0, 0))  # Desenha a imagem de fundo
@@ -205,19 +204,16 @@ def TelaCarregamento(janela, pathImagemTelaPrincipal, message_queue, response_qu
         pygame.display.flip()
 
         if(resposta[0] == "Match started"):
-            print("achou a partida")
             return 0
         elif(not response_queue.empty()):
-            resposta = message_queue.get()
-            print("nao achou a partida ainda")
-            print(resposta)
+            resposta = response_queue.get()
 
         # Eventos
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 Fechar(message_queue)
 
-def TelaPartida(janela, cartas, turno, imagemPantano, message_queue, response_queue):
+def TelaPartida(janela, baralho, turno, imagemPantano, message_queue, response_queue):
     # Definições de constantes
     LARGURA_CARTA = 250  # Aumenta o tamanho das cartas
     ALTURA_CARTA = 350  # Aumenta o tamanho das cartas
@@ -247,8 +243,18 @@ def TelaPartida(janela, cartas, turno, imagemPantano, message_queue, response_qu
         print(f"Erro ao carregar a imagem de fundo: {e}")
         Fechar(message_queue)
 
+    # Recupera as cartas do baralho
+    message_queue.put(f"check_deck {baralho[1]}")
+    nomes = response_queue.get()[2]
+    
+    # Recupera o caminho para as imagens das cartas
+    paths = []
+    for nome in nomes:
+        message_queue.put(f"check_card {nome}")
+        paths.append(response_queue.get()[7])
+    
     # Carregar imagens das cartas
-    imagens_cartas = [pygame.image.load(carta).convert_alpha() for carta in cartas]
+    imagens_cartas = [pygame.image.load(path[1:]).convert_alpha() for path in paths]
     selecao = None
 
     fonte_titulo = pygame.font.Font(None, 50)
@@ -298,10 +304,10 @@ def TelaPartida(janela, cartas, turno, imagemPantano, message_queue, response_qu
 
                 # Verificar se o botão de confirmação foi clicado
                 if botao_rect.collidepoint(pos) and selecao is not None:
-                    return cartas[selecao]  # Retorna a carta selecionada
+                    return paths[selecao]  # Retorna a carta selecionada
 
                 # Verificar se uma das cartas foi clicada
-                for idx in range(len(cartas)):
+                for idx in range(len(paths)):
                     rect = pygame.Rect(pos_x + idx * (LARGURA_CARTA + MARGEM), pos_y, LARGURA_CARTA, ALTURA_CARTA)
                     if rect.collidepoint(pos):
                         selecao = idx

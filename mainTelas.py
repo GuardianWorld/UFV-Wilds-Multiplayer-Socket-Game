@@ -35,13 +35,7 @@ def startInterface(message_queue, response_queue):
                     return
                 #ramo de mudar o baralho
                 if(saidaTelaMenuPrincipal == 1):
-                    while True:
-
-                        #0 = ver decks TelaMostrarDecks (aqui que deleta deck e marca que está usando)
-                        #1 = ver coleção TelaMostrarCartasBaralho
-                        #2 = criar deck TelaCriarDeck
-                        #3 = voltar ao menu
-                        
+                    while True:                        
                         saidaTelaMudarBaralho = TelaMudarBaralho(janela, message_queue, response_queue, imagemCerrado)
                         
                         if(saidaTelaMudarBaralho == 0):
@@ -50,15 +44,6 @@ def startInterface(message_queue, response_queue):
                             baralhos = np.array(response_queue.get())
 
                             while True:
-
-                                #precisa como entrada a coleção de baralhos, onde cada baralho é composto pelo caminho das imagens das cartas
-                                #nome dos baralho é literalmente o nome de todos os baralhos
-                                #vai mostrar todos os decks do usuario, depois de ele escolher 1
-                                #chama a função TelaMostrarCartasBaralho
-                                # que vai retornar 0 e o baralho caso o usuario escolha deletar
-                                # Retornar 1 e o baralho quando "Escolher Deck Ativo" for clicado.
-                                # retorna 2 se o usuario clicar em voltar e none
-
                                 saidaTelaMostraDecks = TelaMostrarDecks(janela, baralhos, imagemCerrado, message_queue, response_queue)
 
                                 if(saidaTelaMostraDecks == 0):
@@ -92,11 +77,23 @@ def startInterface(message_queue, response_queue):
                         else:
                             break
                 else:
+                    # Recupera as informações dos decks
+                    message_queue.put("check_decks")
+                    baralhos = np.array(response_queue.get())
+
+                    # Seleciona o baralho ativo
+                    for baralho in baralhos:
+                        if baralho[3] == 1:
+                            break
+                    
+                    # esse aki n da erro
+                    # TelaPartida(janela, baralho, 0, imagemPantano, message_queue, response_queue)
                     respostaTelaCarregamento = TelaCarregamento(janela, pathImagemTelaPrincipal, message_queue, response_queue)
                     
-                    if(respostaTelaCarregamento == 0):
-                        #retorna a carta escolhida, e o baralho3 é o caminho das 3 cartas do usuário
-                        TelaPartida(janela, baralho3, 0, imagemPantano, message_queue, response_queue)
+                    # esse da erro
+                    # if(respostaTelaCarregamento == 0):
+                    #     # retorna a carta escolhida, e o baralho3 é o caminho das 3 cartas do usuário
+                    #     TelaPartida(janela, baralho, 0, imagemPantano, message_queue, response_queue)
 
                     #retorna o atributo escolhido
                     # TelaSelecaoAtributo(janela, imagemPantano, message_queue, response_queue)

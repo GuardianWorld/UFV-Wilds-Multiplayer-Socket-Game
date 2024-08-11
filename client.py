@@ -376,6 +376,7 @@ def client_handler(client_socket):
                     message_flag = True
                     # message = input("Enter a message: ")
                     message = message_queue.get()
+                    print(message)
             else:
                 if(on_match):
                     match_handler(client_socket)
