@@ -204,7 +204,7 @@ def TelaCarregamento(janela, pathImagemTelaPrincipal, message_queue, response_qu
         pygame.display.flip()
 
         if(resposta[0] == "Match started"):
-            return 0
+            return 1
         elif(not response_queue.empty()):
             resposta = response_queue.get()
 
@@ -681,7 +681,7 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
                     caixa_texto_ativa = False
                     
                 if botao_voltar.collidepoint(mouseX, mouseY):
-                    return 3  # Retorna 3 quando o botão de voltar é clicado
+                    return 
 
                 if total_selecionadas == LIMITE_CARTAS and len(nome_deck) > 0:
                     # Verificar se o botão "Confirmar" foi clicado

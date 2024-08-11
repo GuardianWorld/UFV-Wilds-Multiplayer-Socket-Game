@@ -80,9 +80,9 @@ def startInterface(message_queue, response_queue):
                     # Recupera as informações dos decks
                     message_queue.put("check_decks")
                     baralhos = np.array(response_queue.get())
-
                     # Seleciona o baralho ativo
                     for baralho in baralhos:
+                        print(baralho)
                         if baralho[3] == 1:
                             break
                     
@@ -90,6 +90,15 @@ def startInterface(message_queue, response_queue):
                     # TelaPartida(janela, baralho, 0, imagemPantano, message_queue, response_queue)
                     respostaTelaCarregamento = TelaCarregamento(janela, pathImagemTelaPrincipal, message_queue, response_queue)
                     
+                    while(True):
+                        if(respostaTelaCarregamento == 0):
+                            break
+                        TelaPartida(janela, baralho, 0, imagemPantano, message_queue, response_queue)
+                        TelaSelecaoAtributo(janela, imagemPantano, message_queue, response_queue)
+                        TelaSelecaoCarta(janela, baralho, 0, imagemPantano, message_queue, response_queue)
+                        TelaVencedor(janela, "Marcus", 1, True, imagemPantano, message_queue, response_queue)
+                            
+                        
                     # esse da erro
                     # if(respostaTelaCarregamento == 0):
                     #     # retorna a carta escolhida, e o baralho3 é o caminho das 3 cartas do usuário
