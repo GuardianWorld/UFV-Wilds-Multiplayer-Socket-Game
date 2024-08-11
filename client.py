@@ -22,8 +22,7 @@ downloading_file = False
 
 
 def close_connection(client_socket):
-    # print("[*] Disconnected from server.")
-    response_queue.put("disconnected from server")
+    print("[*] Disconnected from server.")
     
     client_socket.close()
     
@@ -166,12 +165,16 @@ def receive_message(client_socket):
             
             #response_json = json.loads(response)
             if(response_json == None):
-                # print(f"[*] Empty Packet")
+                print(f"[*] Empty Packet")
                 response_queue.put("Empty packet")
                 continue
             
             message = response_json.get('message')
             command = response_json.get('command')
+
+            # print(str(response_json))
+            # print(message)
+            # print(command)
             
             # print(f"[*] Received: {response_json}")
             if(command == "ping"):
@@ -181,11 +184,10 @@ def receive_message(client_socket):
                 token = response_json.get('token')
                 username = response_json.get('username')
                 login_operation(client_socket)
-                response_queue.put(message)
                 
             
             elif(command == "logoff"):
-                # print(f"[*] Turning off")
+                print(f"[*] Turning off")
                 response_queue.put("Turning off")
                 sleep(0.5)
                 stop_event.set()
@@ -193,7 +195,7 @@ def receive_message(client_socket):
             
             elif(command == "serverside_logoff"):
                 reason = response_json.get('message')
-                # print(f"[*] You have been disconnected from the server.")
+                print(f"[*] You have been disconnected from the server.")
                 # print(f"[*] Reason: {reason}")
                 response_queue.put(["You have been disconnected", reason])
                 sleep(1)
@@ -220,10 +222,10 @@ def receive_message(client_socket):
                 response_queue.put([card_name, forca, fofura, velocidade, tamanho, idade, tipo, imagem])
             
             elif(command == "check_cards"):
-                cards = response_json.get('cards')
-                for card in cards:
+                # cards = response_json.get('cards')
+                # for card in cards:
                     # print(f"[*] Card: {card[0]} Amount: {card[1]}")
-                    response_queue.put([card[0], card[1]])
+                response_queue.put(response_json.get('cards'))
             
             elif(command == "create_deck"):
                 deck_name = response_json.get('deck_name')
@@ -233,44 +235,44 @@ def receive_message(client_socket):
             elif(command == "delete_deck"):
                 deck_name = response_json.get('deck_name')
                 # print(f"[*] Deck {deck_name} deleted")
-                response_queue.put(["Deck deleteted", deck_name])
+                response_queue.put(["Deck deleted", deck_name])
             
             elif(command == "check_decks"):
-                decks = response_json.get('decks')
-                for deck in decks:
+                # decks = response_json.get('decks')
+                # for deck in decks:
                     # grab out the ID, Name, User ID, Active and default
-                    deck_id, deck_name, user_id, active, default = deck
-                    if(active == 1):
-                        active = "Yes"
-                    else:
-                        active = "No"
-                    if(default == 1):
-                        default = "Yes"
-                    else:
-                        default = "No"
+                    # deck_id, deck_name, user_id, active, default = deck
+                    # if(active == 1):
+                    #     active = "Yes"
+                    # else:
+                    #     active = "No"
+                    # if(default == 1):
+                    #     default = "Yes"
+                    # else:
+                    #     default = "No"
                     # print(f"[*] Deck Name: {deck_name}, Active: {active}, Default: {default}")
-                    response_queue.put(["Deck name, active, default", deck_name, active, default])
+                response_queue.put(response_json.get('decks'))
 
             elif(command == "check_deck"):
-                deck = response_json.get('deck_name')
+                deck_name = response_json.get('deck_name')
                 cards = response_json.get('cards')
                 active = response_json.get('active')
                 
                 # print(f"[*] Deck: {deck}, Active: {active}")
-                response_queue.put(["Deck, active, cards", deck, active, cards])
-                for card in cards:
-                    print(f"[*] Card: {card}")                
+                # for card in cards:
+                #     print(f"[*] Card: {card}")
+                response_queue.put([deck_name, active, cards])
             
             elif(command == "activate_deck"):
                 deck_name = response_json.get('deck_name')
                 # print(f"[*] Deck {deck_name} activated")
-                response_queue(["Activated deck", deck_name])
+                response_queue.put(["Activated deck", deck_name])
                 
             elif(command == "add_card_to_deck"):
                 card_name = response_json.get('card_name')
                 deck_name = response_json.get('deck_name')
                 # print(f"[*] Card {card_name} added to deck {deck_name}")
-                response_queue.put(["Card added", card_name, deck_name])
+                response_queue.put("Card added", card_name, deck_name)
                 
             elif(command == "remove_card_from_deck"):
                 card_name = response_json.get('card_name')
@@ -325,7 +327,7 @@ def receive_message(client_socket):
             elif(command == "reward"):
                 reward = response_json.get('card')
                 # print(f"[*] Reward: {response_json.get('card')}") 
-                response_queue.put(["Reward", reward])     
+                response_queue.put(["Reward", reward])
             elif(command == "card_hand"):
                 hand = response_json.get('hand')  
                 cards = response_json.get('cards')
@@ -510,7 +512,7 @@ def add_card_to_deck(message, token):
         return False, {"token": token, "message": "Not logged in", "command": "error"}
     
     parts = message.split(' ', 2)
-    print(parts)
+
     if(len(parts) != 3):
         return False, {"token": token, "message": "Invalid input", "command": "error"}
     
