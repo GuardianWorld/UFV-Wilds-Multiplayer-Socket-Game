@@ -425,10 +425,10 @@ def handle_client(client_socket, client_address):
         while not stop_event.is_set():
             try:
                 if(client_address in logged_users):
-                    if(match.player_in_match(logged_users[client_address])):
+                    if(match.player_in_match(logged_users[client_address]) or match.player_searching(logged_users[client_address])):
                         time.sleep(1)
                         continue
-                        
+                
                 request = client_socket.recv(8192)
                 if not request:
                     break

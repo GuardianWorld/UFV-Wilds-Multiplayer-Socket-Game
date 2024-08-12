@@ -5,7 +5,7 @@ Para jogar UFV Wilds pelo terminal, basta fazer o seguinte:
 
 em caso de sucesso, os seguintes comandos podem ser realizados:
 
-- match_search: Procura partida, tem que ter pelo menos 3 clientes procurando.
+- match_search: Procura partida, tem que ter pelo menos 3 clientes procurando. Esse comando bloqueia mensagens com o servidor até encontrar uma partida ou o programa ser fechado.
 - check_cards: mostra todas as cartas
 - check_card [nome]: Mostra informações sobre uma carta em especifico
 - create_deck [nome]: Cria um novo deck.

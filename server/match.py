@@ -77,7 +77,6 @@ def get_attribute(player):
             request = player['socket'].recv(8192)
             data = json.loads(request.decode())
             command = data.get('command')
-            print(data)
             if(command == "select_attribute"):
                 attribute = data.get('attribute')
                 if(attribute == "Forca" or
