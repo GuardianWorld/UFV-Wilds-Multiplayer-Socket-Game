@@ -169,6 +169,7 @@ def receive_message(client_socket):
                 response_queue.put("Empty packet")
                 continue
             
+            print("recebido:", response_json)
             message = response_json.get('message')
             command = response_json.get('command')
 
@@ -306,7 +307,7 @@ def receive_message(client_socket):
                 hand = response_json.get('hand')
                 # print(f"[*] Select a card")
                 # print(f"[*] Attribute in play: {attribute_in_play}")
-                response_queue.put(["Select card", attribute_in_play])
+                response_queue.put("Select card")
                 # x = 0
                 # for card, card_value in hand:
                 #     print(f"[*] Card: {card[1]} Value: {card_value}")
@@ -334,7 +335,7 @@ def receive_message(client_socket):
                 # print(f"[*] Remaining in deck: {cards}")
                 # for card in hand:
                 #     print(f"[*] Card: {card[1]}")
-                response_queue.put(["Remaining in deck, hand", cards, hand])
+                response_queue.put([cards, hand])
             elif(command == "msg"):                    
                 sender = response_json.get('sender')
                 message = response_json.get('message')
@@ -379,8 +380,8 @@ def client_handler(client_socket):
                     #if login do not print
                     if(message.split(' ', 1)[0] == "login"):
                         print(f"[*] login")
-                    else:
-                        print(message)
+                    # else:
+                    #     print(message)
             else:
                 if(on_match):
                     match_handler(client_socket)
@@ -389,6 +390,7 @@ def client_handler(client_socket):
             if(message_flag and not stop_event.is_set()):
                 message_flag = False
                 send_status, packed_message = package_message(message, token)
+                print("enviado:", packed_message)
                 if not send_status:
                     # print(f"[*] {packed_message.get('message')}")
                     response_queue.put(f"{packed_message.get('message')}")

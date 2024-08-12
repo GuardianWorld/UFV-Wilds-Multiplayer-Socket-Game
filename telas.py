@@ -13,6 +13,10 @@ pygame.init()
 BRANCO = (255, 255, 255)
 PRETO = (0, 0, 0)
 
+# Definir caminho da imagem das cartas
+CAMINHO = "StreamingAssets/"
+EXTENSAO = ".png"
+
 ################################################Telas#######################################
 # Cria a janela com um tamanho e altura
 
@@ -213,7 +217,7 @@ def TelaCarregamento(janela, pathImagemTelaPrincipal, message_queue, response_qu
             if event.type == pygame.QUIT:
                 Fechar(message_queue)
 
-def TelaPartida(janela, baralho, turno, imagemPantano, message_queue, response_queue):
+def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
     # Definições de constantes
     LARGURA_CARTA = 250  # Aumenta o tamanho das cartas
     ALTURA_CARTA = 350  # Aumenta o tamanho das cartas
@@ -243,22 +247,13 @@ def TelaPartida(janela, baralho, turno, imagemPantano, message_queue, response_q
         print(f"Erro ao carregar a imagem de fundo: {e}")
         Fechar(message_queue)
 
-    # Recupera as cartas do baralho
-    message_queue.put(f"check_deck {baralho[1]}")
-    nomes = response_queue.get()[2]
-    
-    # Recupera o caminho para as imagens das cartas
-    paths = []
-    for nome in nomes:
-        message_queue.put(f"check_card {nome}")
-        paths.append(response_queue.get()[7])
-    
-    # Carregar imagens das cartas
-    imagens_cartas = [pygame.image.load(path[1:]).convert_alpha() for path in paths]
     selecao = None
 
+    turno = response_queue.get()
+    baralho, mao = response_queue.get()
+
     fonte_titulo = pygame.font.Font(None, 50)
-    texto_turno = fonte_titulo.render(f'Turno: {turno}', True, PRETO)  # Cor do texto do turno ajustada para preto
+    texto_turno = fonte_titulo.render(f'Turno: {turnos}', True, PRETO)  # Cor do texto do turno ajustada para preto
     texto_turno_rect = texto_turno.get_rect(center=(largura_tela // 2, MARGEM_SUPERIOR // 2))
 
     # Desenho da caixa ao redor do texto
@@ -266,7 +261,23 @@ def TelaPartida(janela, baralho, turno, imagemPantano, message_queue, response_q
     caixa_rect = texto_turno_rect.inflate(2 * margem_caixa, 2 * margem_caixa)
     caixa_rect.topleft = (texto_turno_rect.left - margem_caixa, texto_turno_rect.top - margem_caixa)
 
+    # Recupera a imagem das cartas
+    paths = []
+    for i in range(3):
+        paths.append(mao[i][9])
+    imagens_cartas = [pygame.image.load(path[1:]).convert_alpha() for path in paths]
+
+    atributo_selecionado = False
+    fim_turno = False
+
+    if turno == "Your turn":
+        print(response_queue.get())
+
     while True:
+        if(not response_queue.empty()):
+            if(response_queue.get() == "Select card"):
+                atributo_selecionado = True
+        
         janela.blit(fundo, (0, 0))  # Desenha o fundo
 
         # Desenhar a caixa branca ao redor do texto do turno
@@ -284,13 +295,23 @@ def TelaPartida(janela, baralho, turno, imagemPantano, message_queue, response_q
             if selecao == idx:
                 pygame.draw.rect(janela, VERMELHO, rect, 5)
 
+        # Desenhar o botão de selecionar atributo
+        if(turno == "Your turn" and atributo_selecionado == False):
+            botao_selecionar = pygame.Rect((largura_tela - 260) // 2, pos_y_botoes, 260, ALTURA_BOTAO)
+            pygame.draw.rect(janela, VERDE, botao_selecionar)
+            fonte_botao = pygame.font.Font(None, 36)
+            texto_botao = fonte_botao.render('Selecionar atributo', True, BRANCO)
+            texto_botao_rect = texto_botao.get_rect(center=botao_selecionar.center)
+            janela.blit(texto_botao, texto_botao_rect)
+        
         # Desenhar o botão de confirmação
-        botao_rect = pygame.Rect((largura_tela - LARGURA_BOTAO) // 2, pos_y_botoes, LARGURA_BOTAO, ALTURA_BOTAO)
-        pygame.draw.rect(janela, VERDE, botao_rect)
+        botao_confirmar = pygame.Rect((largura_tela - LARGURA_BOTAO - 20), pos_y_botoes, LARGURA_BOTAO, ALTURA_BOTAO)
+        pygame.draw.rect(janela, VERDE, botao_confirmar)
         fonte_botao = pygame.font.Font(None, 36)
         texto_botao = fonte_botao.render('Confirmar', True, BRANCO)
-        texto_botao_rect = texto_botao.get_rect(center=botao_rect.center)
+        texto_botao_rect = texto_botao.get_rect(center=botao_confirmar.center)
         janela.blit(texto_botao, texto_botao_rect)
+
 
         pygame.display.flip()
 
@@ -303,14 +324,33 @@ def TelaPartida(janela, baralho, turno, imagemPantano, message_queue, response_q
                 pos = pygame.mouse.get_pos()
 
                 # Verificar se o botão de confirmação foi clicado
-                if botao_rect.collidepoint(pos) and selecao is not None:
-                    return paths[selecao]  # Retorna a carta selecionada
+                if atributo_selecionado == True:
+                    if botao_confirmar.collidepoint(pos) and selecao is not None:
+                        message_queue.put(f"select_card {mao[selecao][1]}")
+                        
+                        while True:
+                            if not response_queue.empty:
+                                if response_queue.get()[0] == "Turn ended":
+                                    fim_turno = True
+                                    break
+                        break
+
+                # Verificar se o botão de selecionar atributo foi clicado
+                if(turno == "Your turn"):
+                    if botao_selecionar.collidepoint(pos):
+                        atributo_selecionado = TelaSelecaoAtributo(janela, imagemPantano, message_queue, response_queue)
 
                 # Verificar se uma das cartas foi clicada
                 for idx in range(len(paths)):
                     rect = pygame.Rect(pos_x + idx * (LARGURA_CARTA + MARGEM), pos_y, LARGURA_CARTA, ALTURA_CARTA)
                     if rect.collidepoint(pos):
                         selecao = idx
+        
+        if fim_turno:
+            turno = response_queue.get()
+            baralho, mao = response_queue.get()
+
+            continue
 
 def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_queue, response_queue):
     BRANCO = (255, 255, 255)
@@ -374,7 +414,7 @@ def TelaSelecaoAtributo(janela, imagemPantano, message_queue, response_queue):
     VERMELHO = (255, 0, 0)
     PRETO = (0, 0, 0)
     VERDE = (0, 255, 0)
-    atributos = ['Força', 'Fofura', 'Velocidade', 'Tamanho', 'Idade', 'Tipo']
+    atributos = ['Forca', 'Fofura', 'Velocidade', 'Tamanho', 'Idade', 'Tipo']
     pos_y = 200  # Ajusta a posição vertical dos botões
     selecao = None
 
@@ -450,7 +490,8 @@ def TelaSelecaoAtributo(janela, imagemPantano, message_queue, response_queue):
                                                   pos_y + len(atributos) * (ALTURA_BOTAO + MARGEM),
                                                   LARGURA_BOTAO, ALTURA_BOTAO)
                     if botao_confirmar.collidepoint(pos):
-                        return atributos[selecao]
+                        message_queue.put(f"select_attribute {atributos[selecao]}")
+                        return True
 
 def TelaEscolherBaralho(janela, jogador, message_queue, response_queue):
     fonte = pygame.font.SysFont('Arial', 30)
@@ -582,11 +623,10 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
     # Recupera o caminho para as imagens das cartas
     paths = []
     for nome in todasCartas[:, 0]:
-        message_queue.put(f"check_card {nome}")
-        paths.append(response_queue.get()[7])
+        paths.append(f"{CAMINHO}{nome}{EXTENSAO}")
     
     # Carregar imagens das cartas
-    imagens_cartas = [pygame.image.load(path[1:]).convert_alpha() for path in paths]
+    imagens_cartas = [pygame.image.load(path).convert_alpha() for path in paths]
 
     # Inicializar variáveis
     quantidade = [0] * todasCartas.shape[0]
@@ -761,8 +801,7 @@ def TelaMostrarColecao(janela, todasCartas, imagemFundo, message_queue, response
     # Recupera o caminho para as imagens das cartas
     paths = []
     for nome in todasCartas[:,0]:
-        message_queue.put(f"check_card {nome}")
-        paths.append(response_queue.get()[7])
+        paths.append(f"{CAMINHO}{nome}{EXTENSAO}")
 
     rodando_cartas = True
     while rodando_cartas:
@@ -780,7 +819,7 @@ def TelaMostrarColecao(janela, todasCartas, imagemFundo, message_queue, response
 
         # Desenhar as cartas
         for i, path_imagem in enumerate(paths):
-            imagem = pygame.image.load(path_imagem[1:])
+            imagem = pygame.image.load(path_imagem)
             imagem_redimensionada = pygame.transform.scale(imagem, (largura_carta, altura_carta))
             x = x_inicial + (i % colunas) * (largura_carta + margem)
             y = y_inicial + (i // colunas) * (altura_carta + margem)
@@ -894,8 +933,7 @@ def TelaMostrarCartasBaralho(janela, baralho, index_baralho, imagemFundo, messag
     # Recupera o caminho para as imagens das cartas
     paths = []
     for nome in nomes:
-        message_queue.put(f"check_card {nome}")
-        paths.append(response_queue.get()[7])
+        paths.append(f"{CAMINHO}{nome}{EXTENSAO}")
     
     rodando_cartas = True
     while rodando_cartas:
@@ -929,7 +967,7 @@ def TelaMostrarCartasBaralho(janela, baralho, index_baralho, imagemFundo, messag
         janela.blit(fundo, (0, 0))
 
         for i, path_imagem in enumerate(paths):
-            imagem = pygame.image.load(path_imagem[1:])
+            imagem = pygame.image.load(path_imagem)
             imagem_redimensionada = pygame.transform.scale(imagem, (largura_carta, altura_carta))
             x = x_inicial + (i % colunas) * (largura_carta + margem)
             y = y_inicial + (i // colunas) * (altura_carta + margem)
