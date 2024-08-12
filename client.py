@@ -146,6 +146,7 @@ def receive_message(client_socket):
     global token
     global on_match
     global login_into_server
+    global searching_for_match
     
     response_json = {}
     data = b""
@@ -283,6 +284,7 @@ def receive_message(client_socket):
                 
             #Match Commands    
             elif(command == "match_start"):
+                searching_for_match = False
                 player_1 = response_json.get('player_1')
                 player_2 = response_json.get('player_2')
                 player_3 = response_json.get('player_3')
