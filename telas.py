@@ -256,6 +256,8 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
     texto_turno = fonte_titulo.render(f'Turno: {turnos}', True, PRETO)  # Cor do texto do turno ajustada para preto
     texto_turno_rect = texto_turno.get_rect(center=(largura_tela // 2, MARGEM_SUPERIOR // 2))
 
+    print(turno)
+
     # Desenho da caixa ao redor do texto
     margem_caixa = 10
     caixa_rect = texto_turno_rect.inflate(2 * margem_caixa, 2 * margem_caixa)
@@ -272,8 +274,14 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
 
     if turno == "Your turn":
         print(response_queue.get())
-
-    while True:
+    
+    janela.blit(fundo, (0, 0))  # Desenha o fundo
+    fonte = pygame.font.Font(None, 74)
+    texto_carregando = fonte.render('Espere seu turno...', True, BRANCO)
+    texto_rect = texto_carregando.get_rect(center=(largura_tela // 2, altura_tela // 2))
+    janela.blit(texto_carregando, texto_rect) 
+    
+    while True:            
         if(not response_queue.empty()):
             if(response_queue.get() == "Select card"):
                 atributo_selecionado = True

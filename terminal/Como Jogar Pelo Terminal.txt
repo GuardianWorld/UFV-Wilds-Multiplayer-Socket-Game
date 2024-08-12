@@ -1,0 +1,24 @@
+Para jogar UFV Wilds pelo terminal, basta fazer o seguinte:
+
+- register [nome] [senha]
+- login [nome] [senha]
+
+em caso de sucesso, os seguintes comandos podem ser realizados:
+
+- match_search: Procura partida, tem que ter pelo menos 3 clientes procurando.
+- check_cards: mostra todas as cartas
+- check_card [nome]: Mostra informações sobre uma carta em especifico
+- create_deck [nome]: Cria um novo deck.
+- delete_deck [nome]: Deleta um deck
+- activate_deck [nome]: Ativa um deck como padrão
+- add_card_to_deck [nome do deck] [nome da carta]: adiciona uma nova carta ao deck.
+- remove_card_from_deck [nome do deck] [nome da carta]: remove uma carta de um deck.
+- check_decks: ve todos os decks que você possui.
+- check_deck [nome]: Ve as cartas dentro de um deck.
+- help: Essa janela de mensagem
+- exit: Fecha o cliente.
+
+em caso de partida encontrada com sucesso, os seguintes comandos podem ser realizados:
+- select_attribute [Nome]: Um atributo para ser jogado, caso seja seu turno.
+- select_card [Nome]: Uma carta para ser jogada, caso seja seu turno.
+- check_card [Nome]: Ve as informações de uma carta.

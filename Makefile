@@ -1,4 +1,4 @@
-.PHONY: venv install server client run
+.PHONY: venv install server client terminal
 
 PYTHON_CMD := python
 
@@ -32,3 +32,6 @@ server: install
 
 client: install
 	$(PYTHON) client.py
+
+terminal: install
+	$(PYTHON) terminal/client_terminal_only.py

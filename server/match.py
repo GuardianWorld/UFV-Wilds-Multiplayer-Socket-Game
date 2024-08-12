@@ -77,9 +77,15 @@ def get_attribute(player):
             request = player['socket'].recv(8192)
             data = json.loads(request.decode())
             command = data.get('command')
+            print(data)
             if(command == "select_attribute"):
                 attribute = data.get('attribute')
-                if(attribute == "Forca" or attribute == "Fofura" or attribute == "Velocidade" or attribute == "Tamanho" or attribute == "Idade" or attribute == "Tipo"):
+                if(attribute == "Forca" or
+                   attribute == "Fofura" or
+                   attribute == "Velocidade" or
+                   attribute == "Tamanho" or
+                   attribute == "Idade" or
+                   attribute == "Tipo"):
                     return attribute
                 else:
                     send_message(player, json.dumps({"status": 400, "message": "Invalid attribute", "command": "error"}).encode())
