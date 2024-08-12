@@ -1,0 +1,47 @@
+Bem vindo ao UFV WILDS!
+
+Esse guia vai te dar uma breve introdução de como jogar!
+Atualizado: 12/08/2024
+
+Primeiro:
+- Existem duas versões, a de terminal (100% concluida) e a de UI (80% concluida)
+- A versão de terminal tem como jogar partidas até sua conclusão.
+- A versão de UI infelizmente quebra ao jogar partidas, mas funciona para todo o resto de forma bem suave.
+
+Então vamos la!
+Se for jogar, primeiro, faça o comando:
+
+> make server
+
+ele ira instalar o VENV, e seus requirements, e iniciar o servidor.
+
+a seguir, apenas faça
+
+>make client ou > make terminal
+
+client vai fazer o jogo com UI, e terminal a versão completa de interface grafica.
+
+Para jogar UFV Wilds pelo terminal, basta fazer o seguinte:
+
+- register [nome] [senha]
+- login [nome] [senha]
+
+em caso de sucesso, os seguintes comandos podem ser realizados:
+
+- match_search: Procura partida, tem que ter pelo menos 3 clientes procurando. Esse comando bloqueia mensagens com o servidor até encontrar uma partida ou o programa ser fechado.
+- check_cards: mostra todas as cartas
+- check_card [nome]: Mostra informações sobre uma carta em especifico
+- create_deck [nome]: Cria um novo deck.
+- delete_deck [nome]: Deleta um deck
+- activate_deck [nome]: Ativa um deck como padrão
+- add_card_to_deck [nome do deck] [nome da carta]: adiciona uma nova carta ao deck.
+- remove_card_from_deck [nome do deck] [nome da carta]: remove uma carta de um deck.
+- check_decks: ve todos os decks que você possui.
+- check_deck [nome]: Ve as cartas dentro de um deck.
+- help: Essa janela de mensagem
+- exit: Fecha o cliente.
+
+em caso de partida encontrada com sucesso, os seguintes comandos podem ser realizados:
+- select_attribute [Nome]: Um atributo para ser jogado, caso seja seu turno.
+- select_card [Nome]: Uma carta para ser jogada, caso seja seu turno.
+- check_card [Nome]: Ve as informações de uma carta.
