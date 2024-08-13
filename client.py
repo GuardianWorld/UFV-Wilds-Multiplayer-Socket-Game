@@ -296,7 +296,7 @@ def receive_message(client_socket):
                 on_match = False
                 # print(f"[*] Match ended.")
                 # print(f"[*] {message}")
-                response_queue.put(["Match ended", message])
+                response_queue.put("Match ended")
             elif(command == "error"):
                 # print(f"[*] Error: {message}")
                 response_queue.put(["Error", message])
@@ -325,12 +325,12 @@ def receive_message(client_socket):
                 # print(f"[*] Turn ended")
                 # print(f"[*] Winner: {winner}")
                 # print(f"[*] {message}")
-                response_queue.put(["Turn ended", winner, message])
+                response_queue.put(["Turn ended", winner])
                 
             elif(command == "reward"):
                 reward = response_json.get('card')
                 # print(f"[*] Reward: {response_json.get('card')}") 
-                response_queue.put(["Reward", reward])
+                response_queue.put(reward)
             elif(command == "card_hand"):
                 hand = response_json.get('hand')  
                 cards = response_json.get('cards')

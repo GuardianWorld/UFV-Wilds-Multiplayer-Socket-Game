@@ -242,22 +242,14 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
     except pygame.error as e:
         print(f"Erro ao carregar a imagem de fundo: {e}")
         Fechar(message_queue)
+        
+    fonte = pygame.font.Font(None, 74)
+    fonte_titulo = pygame.font.Font(None, 50) 
 
     selecao = None
 
     turno = response_queue.get()
     baralho, mao = response_queue.get()
-
-    fonte_titulo = pygame.font.Font(None, 50)
-    texto_turno = fonte_titulo.render(f'Turno: {turnos}', True, PRETO)  # Cor do texto do turno ajustada para preto
-    texto_turno_rect = texto_turno.get_rect(center=(largura_tela // 2, MARGEM_SUPERIOR // 2))
-
-    print(turno)
-
-    # Desenho da caixa ao redor do texto
-    margem_caixa = 10
-    caixa_rect = texto_turno_rect.inflate(2 * margem_caixa, 2 * margem_caixa)
-    caixa_rect.topleft = (texto_turno_rect.left - margem_caixa, texto_turno_rect.top - margem_caixa)
 
     # Recupera a imagem das cartas
     paths = []
@@ -271,24 +263,26 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
     if turno == "Your turn":
         print(response_queue.get())
     
-    janela.blit(fundo, (0, 0))  # Desenha o fundo
-    fonte = pygame.font.Font(None, 74)
-    texto_carregando = fonte.render('Espere seu turno...', True, BRANCO)
-    texto_rect = texto_carregando.get_rect(center=(largura_tela // 2, altura_tela // 2))
-    janela.blit(texto_carregando, texto_rect) 
-    
-    while True:            
+    while True:
         if(not response_queue.empty()):
             if(response_queue.get() == "Select card"):
                 atributo_selecionado = True
         
         janela.blit(fundo, (0, 0))  # Desenha o fundo
-
-        # Desenhar a caixa branca ao redor do texto do turno
-        pygame.draw.rect(janela, BRANCO, caixa_rect)
+        
+        texto_turno = fonte_titulo.render(f'Turno: {turnos}', True, PRETO)  # Cor do texto do turno ajustada para preto
+        texto_turno_rect = texto_turno.get_rect(center=(largura_tela // 2, MARGEM_SUPERIOR // 2))
 
         # Desenhar o título do turno
         janela.blit(texto_turno, texto_turno_rect)
+
+        # Desenho da caixa ao redor do texto
+        margem_caixa = 10
+        caixa_rect = texto_turno_rect.inflate(2 * margem_caixa, 2 * margem_caixa)
+        caixa_rect.topleft = (texto_turno_rect.left - margem_caixa, texto_turno_rect.top - margem_caixa)
+
+        # Desenhar a caixa branca ao redor do texto do turno
+        pygame.draw.rect(janela, BRANCO, caixa_rect)
 
         # Desenhar as cartas
         for idx, imagem in enumerate(imagens_cartas):
@@ -309,13 +303,18 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
             janela.blit(texto_botao, texto_botao_rect)
         
         # Desenhar o botão de confirmação
-        botao_confirmar = pygame.Rect((largura_tela - LARGURA_BOTAO - 20), pos_y_botoes, LARGURA_BOTAO, ALTURA_BOTAO)
-        pygame.draw.rect(janela, VERDE, botao_confirmar)
-        fonte_botao = pygame.font.Font(None, 36)
-        texto_botao = fonte_botao.render('Confirmar', True, BRANCO)
-        texto_botao_rect = texto_botao.get_rect(center=botao_confirmar.center)
-        janela.blit(texto_botao, texto_botao_rect)
-
+        if(atributo_selecionado == True):
+            botao_confirmar = pygame.Rect((largura_tela - LARGURA_BOTAO - 20), pos_y_botoes, LARGURA_BOTAO, ALTURA_BOTAO)
+            pygame.draw.rect(janela, VERDE, botao_confirmar)
+            fonte_botao = pygame.font.Font(None, 36)
+            texto_botao = fonte_botao.render('Confirmar', True, BRANCO)
+            texto_botao_rect = texto_botao.get_rect(center=botao_confirmar.center)
+            janela.blit(texto_botao, texto_botao_rect)
+        else:
+            if turno == "Oppnent turn":
+                texto_carregando = fonte.render('Espere sua vez...', True, BRANCO)
+                texto_rect = texto_carregando.get_rect(center=(largura_tela // 2, altura_tela // 2))
+                janela.blit(texto_carregando, texto_rect)
 
         pygame.display.flip()
 
@@ -333,8 +332,9 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
                         message_queue.put(f"select_card {mao[selecao][1]}")
                         
                         while True:
-                            if not response_queue.empty:
-                                if response_queue.get()[0] == "Turn ended":
+                            if not response_queue.empty():
+                                resposta, vencedor = response_queue.get()
+                                if resposta == "Turn ended":
                                     fim_turno = True
                                     break
                         break
@@ -351,10 +351,29 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
                         selecao = idx
         
         if fim_turno:
+            turnos = turnos + 1 
+            
+            # Verifica se o jogo acabou e mostra a tela de vencedor do jogo ou do turno
             turno = response_queue.get()
-            baralho, mao = response_queue.get()
+            if turno == "Match ended":
+                TelaVencedor(janela, vencedor, turnos, True, imagemPantano, message_queue, response_queue)
+                return
+            
+            TelaVencedor(janela, vencedor, turnos, False, imagemPantano, message_queue, response_queue)
 
-            continue
+            # Reseta os valores do turno
+            selecao = None
+            
+            baralho, mao = response_queue.get()
+            
+            # Recupera a imagem das cartas
+            paths = []
+            for i in range(3):
+                paths.append(mao[i][9])
+            imagens_cartas = [pygame.image.load(path[1:]).convert_alpha() for path in paths]
+
+            atributo_selecionado = False
+            fim_turno = False
 
 def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_queue, response_queue):
     BRANCO = (255, 255, 255)
@@ -369,6 +388,7 @@ def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_
         print(f"Erro ao carregar a imagem de fundo: {e}")
         Fechar(message_queue)
 
+    recompensa = None
     if jogo_completo:
         mensagem = f'{vencedor} venceu o jogo!'
     else:
@@ -385,8 +405,12 @@ def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_
     tempo_inicio = pygame.time.get_ticks()
     piscando = True
     piscado_repeticoes = 0
+    recompensa = None
 
     while True:
+        if not response_queue.empty() and jogo_completo:
+            recompensa = response_queue.get()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 Fechar(message_queue)
@@ -402,6 +426,9 @@ def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_
                 if piscado_repeticoes >= piscar_repeticoes:
                     pygame.display.flip()
                     pygame.time.wait(intervalo_pausa)  # Pausa após as piscadas
+                    if not recompensa == None:
+                        texto_recompensa = fonte.render(f"Você ganhou a carta: {recompensa}", True, AMARELO)
+                        janela.blit(texto_recompensa, texto_rect)
                     return  # Retorna após concluir a exibição
 
         pygame.display.flip()

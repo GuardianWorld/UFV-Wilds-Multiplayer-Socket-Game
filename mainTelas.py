@@ -83,22 +83,7 @@ def startInterface(message_queue, response_queue):
                         if(respostaTelaCarregamento == 0):
                             break
                         TelaPartida(janela, 0, imagemPantano, message_queue, response_queue)
-                        # TelaSelecaoAtributo(janela, imagemPantano, message_queue, response_queue)
-                        # TelaSelecaoCarta(janela, baralho, 0, imagemPantano, message_queue, response_queue)
-                        TelaVencedor(janela, "Marcus", 1, True, imagemPantano, message_queue, response_queue)
-                            
-                        
-                    # esse da erro
-                    # if(respostaTelaCarregamento == 0):
-                    #     # retorna a carta escolhida, e o baralho3 é o caminho das 3 cartas do usuário
-                    #     TelaPartida(janela, baralho, 0, imagemPantano, message_queue, response_queue)
-
-                    #retorna o atributo escolhido
-                    # TelaSelecaoAtributo(janela, imagemPantano, message_queue, response_queue)
-
-                    # se jogo_completo for True aparece que o jogador ganhou o jogo
-                    # se for false aparece que ele ganhou o turno
-                    # TelaVencedor(janela, "Marcus", 1, True, imagemPantano, message_queue, response_queue)
+                        break
 
 
 if __name__ == "__main__":
