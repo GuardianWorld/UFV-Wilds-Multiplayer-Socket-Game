@@ -13,10 +13,6 @@ pygame.init()
 BRANCO = (255, 255, 255)
 PRETO = (0, 0, 0)
 
-# Definir caminho da imagem das cartas
-CAMINHO = "StreamingAssets/"
-EXTENSAO = ".png"
-
 ################################################Telas#######################################
 # Cria a janela com um tamanho e altura
 
@@ -631,10 +627,11 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
     # Recupera o caminho para as imagens das cartas
     paths = []
     for nome in todasCartas[:, 0]:
-        paths.append(f"{CAMINHO}{nome}{EXTENSAO}")
+        message_queue.put(f"check_card {nome}")
+        paths.append(response_queue.get()[7])
     
     # Carregar imagens das cartas
-    imagens_cartas = [pygame.image.load(path).convert_alpha() for path in paths]
+    imagens_cartas = [pygame.image.load(path[1:]).convert_alpha() for path in paths]
 
     # Inicializar variáveis
     quantidade = [0] * todasCartas.shape[0]
@@ -809,7 +806,8 @@ def TelaMostrarColecao(janela, todasCartas, imagemFundo, message_queue, response
     # Recupera o caminho para as imagens das cartas
     paths = []
     for nome in todasCartas[:,0]:
-        paths.append(f"{CAMINHO}{nome}{EXTENSAO}")
+        message_queue.put(f"check_card {nome}")
+        paths.append(response_queue.get()[7])
 
     rodando_cartas = True
     while rodando_cartas:
@@ -827,7 +825,7 @@ def TelaMostrarColecao(janela, todasCartas, imagemFundo, message_queue, response
 
         # Desenhar as cartas
         for i, path_imagem in enumerate(paths):
-            imagem = pygame.image.load(path_imagem)
+            imagem = pygame.image.load(path_imagem[1:])
             imagem_redimensionada = pygame.transform.scale(imagem, (largura_carta, altura_carta))
             x = x_inicial + (i % colunas) * (largura_carta + margem)
             y = y_inicial + (i // colunas) * (altura_carta + margem)
@@ -941,7 +939,8 @@ def TelaMostrarCartasBaralho(janela, baralho, index_baralho, imagemFundo, messag
     # Recupera o caminho para as imagens das cartas
     paths = []
     for nome in nomes:
-        paths.append(f"{CAMINHO}{nome}{EXTENSAO}")
+        message_queue.put(f"check_card {nome}")
+        paths.append(response_queue.get()[7])
     
     rodando_cartas = True
     while rodando_cartas:
@@ -975,7 +974,7 @@ def TelaMostrarCartasBaralho(janela, baralho, index_baralho, imagemFundo, messag
         janela.blit(fundo, (0, 0))
 
         for i, path_imagem in enumerate(paths):
-            imagem = pygame.image.load(path_imagem)
+            imagem = pygame.image.load(path_imagem[1:])
             imagem_redimensionada = pygame.transform.scale(imagem, (largura_carta, altura_carta))
             x = x_inicial + (i % colunas) * (largura_carta + margem)
             y = y_inicial + (i // colunas) * (altura_carta + margem)
