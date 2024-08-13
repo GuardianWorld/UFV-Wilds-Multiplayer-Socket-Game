@@ -258,6 +258,7 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
     imagens_cartas = [pygame.image.load(path[1:]).convert_alpha() for path in paths]
 
     atributo_selecionado = False
+    atributo = ""
     fim_turno = False
 
     if turno == "Your turn":
@@ -267,6 +268,7 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
         if(not response_queue.empty()):
             if(response_queue.get() == "Select card"):
                 atributo_selecionado = True
+                atributo = response_queue.get()
         
         janela.blit(fundo, (0, 0))  # Desenha o fundo
         
@@ -274,7 +276,6 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
         texto_turno_rect = texto_turno.get_rect(center=(largura_tela // 2, MARGEM_SUPERIOR // 2))
 
         # Desenhar o título do turno
-        janela.blit(texto_turno, texto_turno_rect)
 
         # Desenho da caixa ao redor do texto
         margem_caixa = 10
@@ -283,6 +284,7 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
 
         # Desenhar a caixa branca ao redor do texto do turno
         pygame.draw.rect(janela, BRANCO, caixa_rect)
+        janela.blit(texto_turno, texto_turno_rect)
 
         # Desenhar as cartas
         for idx, imagem in enumerate(imagens_cartas):
@@ -304,6 +306,11 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
         
         # Desenhar o botão de confirmação
         if(atributo_selecionado == True):
+            fonte_atributo_externo = pygame.font.Font(None, 51)
+            texto_atributo_interno = fonte_titulo.render(f'Atributo: {atributo}', True, VERMELHO)
+            texto_atributo_interno_rect = texto_atributo_interno.get_rect(center=(largura_tela // 2, 200))
+            janela.blit(texto_atributo_interno, texto_atributo_interno_rect)
+            
             botao_confirmar = pygame.Rect((largura_tela - LARGURA_BOTAO - 20), pos_y_botoes, LARGURA_BOTAO, ALTURA_BOTAO)
             pygame.draw.rect(janela, VERDE, botao_confirmar)
             fonte_botao = pygame.font.Font(None, 36)

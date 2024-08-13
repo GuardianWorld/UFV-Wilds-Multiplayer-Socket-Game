@@ -310,6 +310,7 @@ def receive_message(client_socket):
                 # print(f"[*] Select a card")
                 # print(f"[*] Attribute in play: {attribute_in_play}")
                 response_queue.put("Select card")
+                response_queue.put(attribute_in_play)
                 # x = 0
                 # for card, card_value in hand:
                 #     print(f"[*] Card: {card[1]} Value: {card_value}")
