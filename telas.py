@@ -364,6 +364,7 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
             turno = response_queue.get()
             if turno == "Match ended":
                 TelaVencedor(janela, vencedor, turnos, True, imagemPantano, message_queue, response_queue)
+                telaRecompensa(janela, 'caminho' ,imagemPantano)
                 return
             
             TelaVencedor(janela, vencedor, turnos, False, imagemPantano, message_queue, response_queue)
@@ -440,6 +441,60 @@ def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_
 
         pygame.display.flip()
         clock.tick(30)
+
+def telaRecompensa(janela, caminhoImagem, caminhoFundo):
+    # Carregando as imagens de fundo e da carta
+    imagem_fundo = pygame.image.load(caminhoFundo)
+    imagem_carta = pygame.image.load(caminhoImagem)
+
+    # Ajustando o tamanho da carta
+    largura_carta = 300  # Defina a largura desejada para a carta
+    altura_carta = 400   # Defina a altura desejada para a carta
+    imagem_carta_grande = pygame.transform.scale(imagem_carta, (largura_carta, altura_carta))
+
+    # Calculando a posição centralizada para a carta
+    largura_janela, altura_janela = janela.get_size()
+    pos_x_carta = (largura_janela - largura_carta) // 2
+    pos_y_carta = (altura_janela - altura_carta) // 2
+
+    # Definindo o botão "Continuar"
+    largura_botao, altura_botao = 150, 50
+    pos_x_botao = (largura_janela - largura_botao) // 2
+    pos_y_botao = altura_janela - altura_botao - 50
+    cor_botao = (0, 255, 0)
+    fonte_botao = pygame.font.Font(None, 36)
+    texto_botao = fonte_botao.render('Continuar', True, (0, 0, 0))
+    rect_botao = pygame.Rect(pos_x_botao, pos_y_botao, largura_botao, altura_botao)
+
+    # Definindo o texto "Recompensa"
+    fonte_recompensa = pygame.font.Font(None, 48)
+    texto_recompensa = fonte_recompensa.render('Recompensa', True, (255, 255, 0))
+    pos_x_recompensa = (largura_janela - texto_recompensa.get_width()) // 2
+    pos_y_recompensa = 20
+
+    # Loop principal
+    while True:
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                return None
+
+            if evento.type == pygame.MOUSEBUTTONDOWN:
+                if rect_botao.collidepoint(evento.pos):
+                    return None
+
+        # Desenhando o fundo e a carta
+        janela.blit(imagem_fundo, (0, 0))
+        janela.blit(imagem_carta_grande, (pos_x_carta, pos_y_carta))
+
+        # Desenhando o texto "Recompensa"
+        janela.blit(texto_recompensa, (pos_x_recompensa, pos_y_recompensa))
+
+        # Desenhando o botão "Continuar"
+        pygame.draw.rect(janela, cor_botao, rect_botao)
+        janela.blit(texto_botao, (pos_x_botao + 20, pos_y_botao + 10))
+
+        # Atualizando a janela
+        pygame.display.flip()
 
 def TelaSelecaoAtributo(janela, imagemPantano, message_queue, response_queue):
     # Definições de constantes
