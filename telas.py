@@ -364,7 +364,6 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
             turno = response_queue.get()
             if turno == "Match ended":
                 TelaVencedor(janela, vencedor, turnos, True, imagemPantano, message_queue, response_queue)
-                telaRecompensa(janela, 'caminho' ,imagemPantano)
                 return
             
             TelaVencedor(janela, vencedor, turnos, False, imagemPantano, message_queue, response_queue)
@@ -435,8 +434,8 @@ def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_
                     pygame.display.flip()
                     pygame.time.wait(intervalo_pausa)  # Pausa após as piscadas
                     if not recompensa == None:
-                        texto_recompensa = fonte.render(f"Você ganhou a carta: {recompensa}", True, AMARELO)
-                        janela.blit(texto_recompensa, texto_rect)
+                        print(recompensa)
+                        telaRecompensa(janela, recompensa,imagemPantano)
                     return  # Retorna após concluir a exibição
 
         pygame.display.flip()
