@@ -264,7 +264,6 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
     if turno == "Your turn":
         print(response_queue.get())
     
-    waiting_for_response = False
     while True:
         if(not response_queue.empty()):
             if(response_queue.get() == "Select card"):
@@ -331,20 +330,24 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
             if event.type == pygame.QUIT:
                 Fechar(message_queue)
 
-            if waiting_for_response:
-                 if not response_queue.empty():
-                    resposta, vencedor = response_queue.get()
-                    if resposta == "Turn ended":
-                        fim_turno = True
-                        break
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
 
                 # Verificar se o botão de confirmação foi clicado
                 if atributo_selecionado == True:
                     if botao_confirmar.collidepoint(pos) and selecao is not None:
                         message_queue.put(f"select_card {mao[selecao][1]}")
-                        waiting_for_response = True
+                        
+                        while True:
+                            for event in pygame.event.get():
+                                if event.type == pygame.QUIT:
+                                    Fechar(message_queue)
+                            if not response_queue.empty():
+                                resposta, vencedor = response_queue.get()
+                                if resposta == "Turn ended":
+                                    fim_turno = True
+                                    break
+                        break
 
                 # Verificar se o botão de selecionar atributo foi clicado
                 if(turno == "Your turn"):
