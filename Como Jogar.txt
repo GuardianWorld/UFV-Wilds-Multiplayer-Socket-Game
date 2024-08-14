@@ -19,7 +19,7 @@ a seguir, apenas faça
 
 client vai fazer o jogo com UI, e terminal a versão sem interface grafica.
 
-Para jogar pelo terminal, basta registrar e logar com uma conta, e em seguida ver seu deck ou começar uma partida! Quando três jogadores aparecerem, uma partida ira começar!
+Para jogar pela UI, basta registrar e logar com uma conta, e em seguida ver seu deck ou começar uma partida! Quando três jogadores aparecerem, uma partida ira começar!
 
 Para jogar UFV Wilds pelo terminal, basta fazer o seguinte:
 
