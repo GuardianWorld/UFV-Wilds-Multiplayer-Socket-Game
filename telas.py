@@ -435,7 +435,7 @@ def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_
                     pygame.time.wait(intervalo_pausa)  # Pausa após as piscadas
                     if not recompensa == None:
                         message_queue.put(f"check_card {recompensa}")
-                        telaRecompensa(janela, response_queue.get()[7],imagemPantano)
+                        telaRecompensa(janela, response_queue.get()[7][1:],imagemPantano)
                     return  # Retorna após concluir a exibição
 
         pygame.display.flip()
