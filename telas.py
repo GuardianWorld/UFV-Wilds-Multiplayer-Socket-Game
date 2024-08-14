@@ -444,7 +444,7 @@ def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_
 def telaRecompensa(janela, caminhoImagem, caminhoFundo):
     # Carregando as imagens de fundo e da carta
     imagem_fundo = pygame.image.load(caminhoFundo)
-    imagem_carta = pygame.image.load(caminhoImagem)
+    imagem_carta = pygame.image.load(caminhoImagem[1:]).convert_alpha()
 
     # Ajustando o tamanho da carta
     largura_carta = 300  # Defina a largura desejada para a carta

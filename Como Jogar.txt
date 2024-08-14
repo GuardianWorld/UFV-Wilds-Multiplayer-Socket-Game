@@ -4,9 +4,7 @@ Esse guia vai te dar uma breve introdução de como jogar!
 Atualizado: 12/08/2024
 
 Primeiro:
-- Existem duas versões, a de terminal (100% concluida) e a de UI (80% concluida)
-- A versão de terminal tem como jogar partidas até sua conclusão.
-- A versão de UI infelizmente quebra ao jogar partidas, mas funciona para todo o resto de forma bem suave.
+- Existem duas versões, a de termina e a de UI
 
 Então vamos la!
 Se for jogar, primeiro, faça o comando:
@@ -19,7 +17,9 @@ a seguir, apenas faça
 
 >make client ou > make terminal
 
-client vai fazer o jogo com UI, e terminal a versão completa de interface grafica.
+client vai fazer o jogo com UI, e terminal a versão sem interface grafica.
+
+Para jogar pelo terminal, basta registrar e logar com uma conta, e em seguida ver seu deck ou começar uma partida! Quando três jogadores aparecerem, uma partida ira começar!
 
 Para jogar UFV Wilds pelo terminal, basta fazer o seguinte:
 
