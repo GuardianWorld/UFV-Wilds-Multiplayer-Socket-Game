@@ -1,4 +1,4 @@
-.PHONY: venv install server client terminal
+.PHONY: venv install server client terminal pyro pyro_client pyro_server
 
 PYTHON_CMD := python
 
@@ -35,3 +35,13 @@ client: install
 
 terminal: install
 	$(PYTHON) terminal/client_terminal_only.py
+
+pyro:
+	$(PYTHON) -m Pyro5.nameserver
+
+pyro_server:
+	$(PYTHON) pyro_server.py
+
+pyro_client:
+	$(PYTHON) pyro_client.py
+
