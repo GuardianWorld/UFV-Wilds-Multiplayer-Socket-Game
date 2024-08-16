@@ -22,7 +22,11 @@ def startInterface(message_queue, response_queue):
     resposta = 1
     while True:
         # retorna 0 se login e 1 se registrar
-        nome, senha = TelaLogin(janela, message_queue, response_queue, pathImagemLogin)
+        nome, senha, status = TelaLogin(janela, message_queue, response_queue, pathImagemLogin)
+        if(status == 1):
+            message_queue.put(f"register {nome} {senha}")
+            continue
+            
         message_queue.put(f"login {nome} {senha}")
         resposta = response_queue.get()
         if(resposta == "logging in"):

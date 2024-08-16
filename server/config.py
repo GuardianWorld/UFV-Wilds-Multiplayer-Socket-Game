@@ -1,5 +1,6 @@
 import threading
 
+heartbeats = {}
 active_connections = {}
 logged_users = {}
 searching_for_match = {}

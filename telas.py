@@ -65,10 +65,10 @@ def TelaLogin(janela, message_queue, response_queue, imagemFundo):
                     ativo_nome = False
                 elif botao_login.collidepoint(evento.pos):
                     # Retorna o nome, senha e 0 para login
-                    return texto_nome, texto_senha
+                    return texto_nome, texto_senha, 0
                 elif botao_registrar.collidepoint(evento.pos):
                     # Retorna o nome, senha e 1 para registrar
-                    return texto_nome, texto_senha
+                    return texto_nome, texto_senha, 1
                 else:
                     ativo_nome = False
                     ativo_senha = False

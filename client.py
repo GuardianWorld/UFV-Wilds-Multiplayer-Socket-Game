@@ -4,12 +4,12 @@ import hashlib
 import string
 import threading
 import json
-import socket
 import sys
 import os
 import queue
 from time import sleep
 from mainTelas import startInterface
+import Pyro5.api
 
 stop_event = threading.Event()
 token = ""
@@ -19,6 +19,7 @@ searching_for_match = False
 on_match = False
 on_turn = False
 downloading_file = False
+client_id = ""
 
 
 def close_connection(client_socket):
@@ -54,18 +55,62 @@ def match_commands(message, token):
         
     return send_status, json_message
     
-def common_commands(message, token):
+def common_commands(message, server):
+    global token
+    global username
+    global client_id
     full_message = message.split(' ', 1)
     command = full_message[0]
-    json_message = {}
-    send_status = True
+    
+    
     
     if(command == "exit"):
         json_message = {"token": token, "message": "", "command": "logoff"}
     elif(command == "register"):
-        send_status, json_message = register(message, token)
+        if(token):
+            print("[*] Already logged in")
+            return
+        parts = message.split(' ', 2)
+        if(len(parts) != 3):
+            print("[*] Invalid input")
+            return
+        user = parts[1]
+        password = parts[2]
+        if(len(password) < 6):
+            print("[*] Password too short")
+            return
+        
+        status, answer = server.register(user, password)
+        
+        print(f"[*] {status}")
+        print(f"[*] {answer}")
+        
+        return
     elif(command == "login"):
-        send_status, json_message = login(message, token)
+        if(token):
+            print("[*] Already logged in")
+            return
+        parts = message.split(' ', 2)
+        if(len(parts) != 3):
+            print("[*] Invalid input")
+            response_queue.put("Invalid Input")
+            return
+        user = parts[1]
+        password = parts[2]
+        if(len(password) < 6):
+            print("[*] Password too short")
+            response_queue.put("Password too short")
+            return
+        
+        status, token = server.login(user, password, client_id)
+        if(status == 200):
+            print(f"[*] Logged in as {user}")
+            username = user
+            response_queue.put("logging in")     
+        else:
+            response_queue.put("Login failed")
+        return
+        
     elif(command == "match_search"):
         send_status, json_message = match_search(token)           
     elif(command == "check_cards"):
@@ -88,25 +133,8 @@ def common_commands(message, token):
         send_status, json_message = delete_deck(message,token)
     elif(command == "check_deck"):
         send_status, json_message = check_deck(message, token)
-    elif(command == "msg"):
-        if not token:
-            return False, {"token": token, "message": "Not logged in", "command": "error"}
-        two_parts = message.split(' ', 2)
-        if(len(two_parts) != 3):
-            return False, {"token": token, "message": "Invalid input", "command": "error"}
-        receiver = two_parts[1]
-        message = two_parts[2]
-        json_message = {"token": token, "message": message, "command": "msg", "receiver": receiver}
-    elif(command == "help"):
-        help()
-        send_status = False
-        json_message = {"token": token, "message": "", "command": "chat"}
-    else:
-        json_message = {"token": token, "message": message, "command": "chat"}
-    
-    return send_status, json_message
 
-def package_message(message, token="none"):
+def package_message(message, server, token="none"):
     global searching_for_match
     global on_match
     json_message = {}
@@ -114,14 +142,15 @@ def package_message(message, token="none"):
 
     try:
         if(on_match):
-            send_status, json_message = match_commands(message, token)
+            match_commands(message, server)
         else:
-            send_status, json_message = common_commands(message, token)
+            common_commands(message, server)
     except Exception as e:
-                json_message = {"token": token, "message": f"Error: {str(e)}", "command": "error"}
-                send_status = False
+        print(f"[*] Package Exception: {str(e)}")
+        response_queue.put(["Package exception", str(e)])
+    
+    return
 
-    return send_status, json_message
 
 def help():
     # print("Commands:")
@@ -360,133 +389,84 @@ def receive_message(client_socket):
             stop_event.set()
             return
 
-def client_handler(client_socket):
-    message_flag = False
-    global stop_event
-    global token
-    global username
-    global login_into_server
-    global on_match
-    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
-    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 3)
-    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
-    
-    # print(f"[*] Connected to {host}:{port}")  
-    try: 
-        while not stop_event.is_set():
-            if not login_into_server:
-                if not message_queue.empty():
-                    message_flag = True
-                    # message = input("Enter a message: ")
-                    message = message_queue.get()
-                    #if login do not print
-                    if(message.split(' ', 1)[0] == "login"):
-                        print(f"[*] login")
-                    # else:
-                    #     print(message)
-            else:
-                if(on_match):
-                    match_handler(client_socket)
-                sleep(1)
-                continue
-            if(message_flag and not stop_event.is_set()):
-                message_flag = False
-                send_status, packed_message = package_message(message, token)
-                print("enviado:", packed_message)
-                if not send_status:
-                    # print(f"[*] {packed_message.get('message')}")
-                    response_queue.put(f"{packed_message.get('message')}")
-                    continue
-                package = json.dumps(packed_message)
-                client_socket.send(package.encode())
-                sleep(0.25)
-
-    except KeyboardInterrupt:
-        # print("\n[*] User interruption.")
-        response_queue.put("User interruption")
-        stop_event.set()
-        exit(0)
-    except Exception as e:
-        # print(f"[*] Sender Exception: {str(e)}")
-        response_queue.put(["Sender excepiton", str(e)])
-        return           
-
 def match_handler(client_socket):
     global on_match
     global on_turn
     while not stop_event.is_set() and on_match:
         pass 
+
+def heartbeats():
+    ns = Pyro5.api.locate_ns()                           
+    uri = ns.lookup("ufv_wilds.server")            
+    server = Pyro5.api.Proxy(uri)                         
+    global stop_event
+    global client_id
+    while not stop_event.is_set():
+        try:
+            server.update_heartbeat(client_id)
+            sleep(5)
+        except Exception as e:
+            print(f"[*] Heartbeat Exception: {str(e)}")
+            return
     
 #Start Client
 def start_client(host, port):
+    ns = Pyro5.api.locate_ns()                           
+    uri = ns.lookup("ufv_wilds.server")             
+    server = Pyro5.api.Proxy(uri)    
     global stop_event
+    global token
+    global username
+    global login_into_server
+    global on_match
+    global client_id         
+    global message_queue
+    global response_queue   
     
-    try:
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((host, port))
-    except ConnectionRefusedError:
-        # print(f"[*] Connection refused to {host}:{port}")
-        response_queue.put(f"[*] Connection refused to {host}:{port}")
-        sleep(2)
-        return    
+    client_id = server.set_connection()
+    if(not client_id):
+        stop_event.set()
+        return
 
-    client_handler_tread = threading.Thread(target=client_handler, args=(client_socket,))
-    client_handler_tread.start()
-    receive_message_thread = threading.Thread(target=receive_message, args=(client_socket,))
-    receive_message_thread.start()
-
+    print(f"[*] Client ID: {client_id}")
+    
+    heartbeats_thread = threading.Thread(target=heartbeats)
+    heartbeats_thread.start()
+                  
+    ui_thread = threading.Thread(target=startInterface, args=(message_queue, response_queue))
+    ui_thread.start()
+          
     try:
         while not stop_event.is_set():
-            # print("rodando thread principal")
-            sleep(1)
+            if(on_match):
+                match_handler(server)
+                sleep(1)
+                continue
+            if not message_queue.empty():
+                message = message_queue.get()
+                print("enviado:", message)
+                if(message == "exit"):
+                    stop_event.set()
+                    break
+                package_message(message, server, token)
+                sleep(0.25)
     except KeyboardInterrupt:
-        # print("\n[*] User interruption, exiting.")
-        response_queue.put("User interruption")
+        print("\n[*] User interruption.")
         stop_event.set()
-
-    if(client_handler_tread.is_alive()):
-        client_handler_tread.join()
+        exit(0)
+        return
+    except Exception as e:
+        print(f"[*] Sender Exception: {str(e)}")
+        response_queue.put(["Sender excepiton", str(e)])
+        return
     
-    if(receive_message_thread.is_alive()):
-        receive_message_thread.join()
+    heartbeats_thread.join()
 
-    close_connection(client_socket)
         
 # Aux Functions
-def register(message, token):
-    
-    if(token):
-        return False, {"token": token, "message": "Already logged in", "command": "error"}
-
-    parts = message.split(' ', 2)
-
-    if(len(parts) != 3):
-        return False, {"token": token, "message": "Invalid input", "command": "error"}
-
-    username = parts[1]
-    password = parts[2]
-
-    if(len(password) < 6):
-        return False, {"token": token, "message": "Password too short", "command": "error"}
-    return True, {"token": token, "message": "requesting registration", "command": "register", "username": username, "password": password}
-
-def login(message, token):
-    if(token):
-        return False, {"token": token, "message": "Already logged in", "command": "error"}
-
-    parts = message.split(' ', 2)
-    if(len(parts) != 3):
-        return False, {"token": token, "message": "Invalid input", "command": "error"}
-    
-    username = parts[1]
-    password = parts[2]
-
-    if(len(password) < 6):
-        return False, {"token": token, "message": "Password too short", "command": "error"}
-    return True, {"token": token, "message": "requesting login", "command": "login", "username": username, "password": password}
 
 def match_search(token):
+    
     if(not token):
         return False, {"token": token, "message": "Not logged in", "command": "error"}
     global searching_for_match
@@ -713,9 +693,6 @@ if __name__ == "__main__":
 
     message_queue = queue.Queue()
     response_queue = queue.Queue()
-
-    ui_thread = threading.Thread(target=startInterface, args=(message_queue, response_queue))
-    ui_thread.start()
 
     host = "localhost"
     port = 25555

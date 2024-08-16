@@ -25,7 +25,7 @@ def listen_for_responses():
 
 def main():
     ns = Pyro5.api.locate_ns()                            # Locate the Pyro nameserver
-    uri = ns.lookup("message.server")             # Look up the URI by name
+    uri = ns.lookup("ufv_wilds.server")             # Look up the URI by name
     server = Pyro5.api.Proxy(uri)                         # Create a proxy for the remote object
 
     # Thread to handle sending messages

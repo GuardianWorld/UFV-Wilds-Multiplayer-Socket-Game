@@ -2,7 +2,6 @@ from os import getcwd
 import argparse
 import random
 import sys
-import socket
 import json
 import threading
 import time
@@ -11,10 +10,12 @@ import signal
 import hashlib
 import base64
 import os
+import Pyro5.api
+import queue
 
 
 import database
-from config import active_connections, stop_event, logged_users, searching_for_match, match_rooms, log_event_level, delay_for_lag
+from config import stop_event, logged_users, match_rooms, log_event_level, delay_for_lag
 import match
 
 files = []
@@ -26,8 +27,129 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGTERM, signal_handler)    
 
+@Pyro5.api.expose
+class UFVWildsServer:
+    def __init__(self):
+        self.client_queues = {}
+        self.clients = []
+        self.logged_users = {}
+        self.heartbeats = {}
+        self.searching_for_match = {}
+
+    #Connection Management
+
+    def set_connection(self):
+        #make unique ID
+        client_id = hashlib.md5(str(datetime.datetime.now()).encode()).hexdigest()
+        self.clients.append(client_id)
+        self.client_queues[client_id] = queue.Queue()
+        return client_id
+    
+    def heartbeats_check(self):
+        try:
+            current_time = time.time()
+            for client_id, _time in self.heartbeats.items():
+                if(current_time - _time > 60):
+                    print(f"[*] Client {client_id} timed out.")
+                    self.logoff(client_id)
+        except Exception as e:
+            pass
+            
+                
+    def update_heartbeat(self, client_id):
+        try:
+            current_time = time.time()
+            self.heartbeats[client_id] = current_time
+        except Exception as e:
+            print(f"Error: {e}")
+    
+    #Account Management
+    
+    def register(self, username, password):
+        if(log_event_level >= 2):
+            print(f"[*] Registration request received, User: {username}")
+            
+        if(database.get_user_id(username)):
+            return 500, "User already exists."
+        
+        if(len(password) < 6):
+            return 500, "Password too short."
+        
+        result = database.add_user(username, password)
+        if(result['status'] == 500):
+            return 500, "Error: User not added."
+        
+        user_id = database.get_user_id(username)[0]
+        cards_9 = database.get_9_random_cards()
+        # Add the cards to the new user
+        for card in cards_9:
+            database.add_card_to_user(user_id, card[0])
+            
+        # Add a default deck
+        database.add_deck(user_id, "Default", 1)
+        
+        #grab deck id
+        deck_id = database.get_deck_id_by_name("Default", user_id)
+        print(deck_id)
+    
+        #add the cards to the deck
+        for card in cards_9:
+            database.add_card_to_deck(deck_id[0], card[0])
+            
+        database.make_deck_active(user_id, deck_id)
+        
+        return 200, f"User {username} registered sucessfully."
+        
+        
+    def login(self, username, password, client_id):
+        if(log_event_level >= 1):
+            print(f"[*] Login request received, User: {username}")
+        Token = ""
+        
+        if(check_online_user(username)):
+            return 500, ""
+        response = database.login_user(username, password)
+        status = response['status']
+        if(response['status'] == 200):
+            if(log_event_level >= 1):
+                print(f"[*] User {username} logged in.")
+            Token = response.get('token')
+            self.logged_users[client_id] = Token
+            
+            #Check if user has active decks.
+            user_id = database.get_user_id(username)[0]
+            if(database.get_active_deck(user_id) == None):
+                deck_id = database.get_deck_id_by_name("Default", user_id)[0]
+                database.make_deck_active(user_id, deck_id)
+        
+        return status, Token
+    
+    def logoff(self, client_id):
+        if client_id in self.heartbeats:
+            del self.heartbeats[client_id]
+        if client_id in self.client_queues:
+            del self.client_queues[client_id]
+        if client_id in self.clients:
+            self.clients.remove(client_id)
+        if client_id in self.logged_users:
+            del self.logged_users[client_id]
+        return "Goodbye!"
+    
+    #Download Management
+    def request_images(self, client_id):
+        if(log_event_level >= 5):
+            print(f"[*] Image request received from {client_id}")
+        response = {"status": 200, "message": "Images received", "command": "request_images", "images": files}
+        return response
+    
+def heartbeat_thread(server):
+    while not stop_event.is_set():
+        server.heartbeats_check()
+        time.sleep(5)
+
 #Start Server
 def start_server(host, port):
+    
 
     print("[*] Starting server...")
     print("[*] Loading StreamingAssets...")
@@ -42,50 +164,47 @@ def start_server(host, port):
         
     #Open DB
     print("[*] Initializing database...")
-    database.init_db()
+    database.init_db()    
     
-    #Open connection
-    try:
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind((host, port))
-        server_socket.listen(5)
-        server_socket.settimeout(5.0)
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
- 
     print("[*] Server started.")
-    print(f"[*] Listening on {host}:{port}")
+    #print(f"[*] Listening on {host}:{port}")
     print(f"[*] Log Level: {log_event_level}")  
-
+    
+    #Pyro Server
+    daemon = Pyro5.api.Daemon(host=host, port=port)
+    ns = Pyro5.api.locate_ns()
+    
+    ufv_wilds_server = UFVWildsServer()
+    uri = daemon.register(ufv_wilds_server)
+    ns.register("ufv_wilds.server", uri)
+    
     terminal = threading.Thread(target=internal_server_terminal)
     terminal.start()
     
-    match_thread = threading.Thread(target=match.search_match)
-    match_thread.start()
+    #match_thread = threading.Thread(target=match.search_match)
+    #match_thread.start()
     
+    heartbeat = threading.Thread(target=heartbeat_thread, args=(ufv_wilds_server,))
+    heartbeat.start()
     
-    while not stop_event.is_set():
-        try:
-            client_socket, client_address = server_socket.accept()
-            client_handler = threading.Thread(target=handle_client, args=(client_socket, client_address,))
-            client_handler.start()
-        except socket.timeout:
-            continue
+    def loop_condition():
+        global stop_event
+        return not stop_event.is_set()
+    
+    # Pyro request loop
+    daemon.requestLoop(loop_condition)
     
     terminal.join()
-    match_thread.join()
+    #match_thread.join()
+    heartbeat.join()
+    
     shutdown_server(1)
-    server_socket.close()
 
 #Shutdown Server
 def shutdown_server(timeout=5):
     print(f"[*] Shutting down server in {timeout} seconds.")
     stop_event.set()
     time.sleep(timeout)
-    for _, client_socket, _ in active_connections.items():
-        client_socket.send(json.dumps({"status": 200, "message": "Server is shutting down.", "command": "serverside_logoff"}).encode())
-        client_socket.close()
     sys.exit(0)
 
 # region Internal Server Terminal
@@ -401,294 +520,12 @@ def terminal_kick():
 
 #endregion
 
-#Server-Client Side
-
-def handle_client(client_socket, client_address):     
-    global log_event_level   
-    if(log_event_level >= 4):
-        print(f"[*] Accepted connection from: {client_address[0]}:{client_address[1]}")
-    active_connections[client_address] = (client_socket, datetime.datetime.utcnow())
-    if not client_socket:
-        return
-
-    client_socket.settimeout(5.0)
-    
-    client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
-    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 3)
-    client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
-    
-    #To be used in the future in case we want to do reconnecting functions
-    client_ip = client_socket.getpeername()[0]
-    
-    try:
-        while not stop_event.is_set():
-            try:
-                if(client_address in logged_users):
-                    if(match.player_in_match(logged_users[client_address]) or match.player_searching(logged_users[client_address])):
-                        time.sleep(1)
-                        continue
-                
-                request = client_socket.recv(8192)
-                if not request:
-                    break
-                data = json.loads(request.decode())
-                response = handle_response(data, client_address, client_socket)
-                response_json = json.dumps(response)      
-                          
-                client_socket.send(response_json.encode())
-            except socket.timeout:
-                continue
-    except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        client_socket.close()
-        del active_connections[client_address]
-        if client_address in logged_users:
-            #grab username
-            username = logged_users[client_address]
-            #delete from searched matches
-            if(match.player_searching(username)):
-                del searching_for_match[username]
-            del logged_users[client_address]
-            print(f"[*] User {username} logged off.")
-        if(log_event_level >= 4):
-            print(f"[*] Connection closed from: {client_address[0]}:{client_address[1]}")
-
-def handle_response(data, client_address, client_socket):
-    global log_event_level
-    message = data.get('message')
-    command = data.get('command')
-    token = data.get('token')
-    response = {}
-
-    
-    if(command == "ping"):
-        response = {"status": 200, "message": "pong", "command": "pong"}
-    
-    
-    if(command == "request_images"):
-        #verify Token for safety
-        user_id, status = database.validate_token(token)
-        if(status.get('status') != 200):
-            return {"status": 401, "message": "Invalid Token", "command": "error"}
-        
-        if(log_event_level >= 5):
-            print(f"[*] Files Requested from: {client_address[0]}:{client_address[1]}")
-        
-        for file in files:
-            image_path, checksum = file
-            response_json = json.dumps({"status": 200, "message": "images", "command": "request_images", "image": image_path, "checksum": checksum})
-            client_socket.send(response_json.encode())
-            #confirm the image was sent
-            confirm = client_socket.recv(8192).decode()
-            confirm = json.loads(confirm)
-            if(confirm.get('command') == "image_received"):
-                continue
-        response = {"status": 200, "message": "images", "command": "request_images_end"}
-        print(f"[*] File List sent to: {client_address[0]}:{client_address[1]}")
-        
-    elif(command == "download_images"):
-        user_id, status = database.validate_token(token)
-        if(status.get('status') != 200):
-            return {"status": 401, "message": "Invalid Token", "command": "error"}
-        
-                
-        if(log_event_level >= 5):
-            print(f"[*] Sending image {data.get('image_path')} to: {client_address[0]}:{client_address[1]}")   
-            
-        streaming_assets_folder = getcwd() + "/StreamingAssets/"
-        
-        if(os.name == 'nt'):
-            streaming_assets_folder = streaming_assets_folder.replace("/", "\\")
-            
-        image_path = streaming_assets_folder + data.get('image_path')    
-        response = {"status": 200, "message": "images", "command": "file_download", "imageb64": image_to_b64(image_path)}
-        
-    elif(command == "logoff"):
-        if(log_event_level >= 4):
-            print(f"[*] Logoff: {client_address[0]}:{client_address[1]}")
-        response = {"status": 200, "message": "Goodbye!", "command": "logoff"}
-        
-    elif(command == "chat"):
-        if(log_event_level >= 5):
-            print(f"[*] Chat message received: {message}")
-        response = {"status": 200, "message": message, "command": "chat"}
-    
-    elif(command == "msg"):
-        if(token == None):
-            return {"status": 401, "message": "Invalid Token", "command": "error"}
-        
-        receiver = data.get('receiver')
-        if(log_event_level >= 5):
-            print(f"[*] Message received: {message}")
-        response = {"status": 200, "message": message, "command": "msg", "sender": logged_users.get(client_address)}
-        for connection, user in logged_users.items():
-            if user == receiver:
-                receiver_socket = active_connections.get(connection)[0]
-                receiver_socket.send(json.dumps(response).encode())
-                break
-    
-    elif(command == "register"):
-        if(log_event_level >= 2):
-            print(f"[*] Registration request received, User: {data.get('username')}")
-        response = register(data.get('username'), data.get('password'), client_address)
-        
-    elif(command == "login"):
-        if(log_event_level >= 1):
-            print(f"[*] Receiving login from user: {data.get('username')}")
-        response = login(data.get('username'), data.get('password'), client_address)
-        if(response['status'] == 200):
-            print(f"[*] User {data.get('username')} logged in.")
-        client_socket.settimeout(300.0)
-        
-    elif(command == "login_finish"):
-        client_socket.settimeout(5.0)
-        
-    elif(command == "check_cards"):
-        user_id = database.get_user_id(logged_users.get(client_address))[0]
-        cards_from_user_cards = database.get_user_cards(user_id)
-        card_list = []
-        for card_v in cards_from_user_cards:
-            #Get the card Name
-            card_id = card_v[2]
-            
-            card = database.get_card_by_id(card_id)
-            card_amount = database.get_card_amount(token, card_id)
-            card_name = card[1]
-            
-            card_list.append((card_name, card_amount))
-            
-        response = {"status": 200, "message": "cards found:", "command": "check_cards", "cards": card_list}
-    
-    elif(command == "check_card"):
-        response = database.get_card_info(data.get('card_name'))
-        
-    elif(command == "check_decks"):
-        response = check_decks(logged_users.get(client_address))
-        
-    elif(command == "activate_deck"):
-        user_id = database.get_user_id(logged_users.get(client_address))[0]
-        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
-        if(deck_id == None):
-            response = {"status": 500, "message": "Deck not found", "command": "error"}
-        else:
-            deck_id = deck_id[0]
-        response = database.activate_deck(token, deck_id)
-    
-    elif(command == "create_deck"):
-        user_id = database.get_user_id(logged_users.get(client_address))[0]
-        deck_name = data.get('deck_name')
-        response = database.add_deck(user_id, deck_name)
-    
-    elif(command == "add_card_to_deck"):
-        user_id = database.get_user_id(logged_users.get(client_address))[0]
-        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
-        if(deck_id == None):
-            response = {"status": 500, "message": "Deck not found", "command": "error"}
-        else:
-            deck_id = deck_id[0]
-        card_id = database.get_card_id(data.get('card_name'))
-        if(card_id == None):
-            response = {"status": 500, "message": "Card not found", "command": "error"}
-        else:
-            card_id = card_id[0]
-        response = database.add_card_to_deck(deck_id, card_id)
-    
-    elif(command == "remove_card_from_deck"):
-        user_id = database.get_user_id(logged_users.get(client_address))[0]
-        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
-        if(deck_id == None):
-            response = {"status": 500, "message": "Deck not found", "command": "error"}
-        else:
-            deck_id = deck_id[0]
-        card_id = database.get_card_id(data.get('card_name'))
-        if(card_id == None):
-            response = {"status": 500, "message": "Card not found", "command": "error"}
-        else:
-            card_id = card_id[0]
-        response = database.remove_card_from_deck(deck_id, card_id)
-    
-    elif(command == "delete_deck"):
-        user_id = database.get_user_id(logged_users.get(client_address))[0]
-        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
-        if(deck_id == None):
-            response = {"status": 500, "message": "Deck not found", "command": "error"}
-        else: 
-            response = database.delete_deck(token, deck_id[0])
-    
-    elif(command == "check_deck"):
-        user_id = database.get_user_id(logged_users.get(client_address))[0]
-        deck_id = database.get_deck_id_by_name(data.get('deck_name'), user_id)
-        if(deck_id != None):
-            response = database.get_deck_info(token,deck_id[0])
-        else:
-            response = {"status": 500, "message": "Deck not found", "command": "error"}
-        
-    elif(command == "match_search"):
-        username = logged_users.get(client_address)
-        if(username == None):
-            return {"status": 401, "message": "User not logged in", "command": "none"}
-        if(log_event_level >= 3):
-            print(f"[*] Match request received from: {username}")
-        response = match.waiting_for_match(username, client_socket)
-        
-    else:
-        response = {"status": 401, "message": "Invalid Command", "command": "none"}
-
-    return response
 
 def check_online_user(username):
     for connection, user in logged_users.items():
         if user == username:
             return True
     return False
-
-def register(username, password, client_address):
-    if(database.get_user_id(username)):
-            return {"status": 500, "message": "User already exists", "command": "error"}
-    else:
-        if(len(password) < 6):
-            return {"status": 500, "message": "Password too short", "command": "error"}
-        cards_9 = database.get_9_random_cards()
-        result = database.add_user(username, password)
-        user_id = database.get_user_id(username)[0]
-        # Add the cards to the new user
-        for card in cards_9:
-            database.add_card_to_user(user_id, card[0])
-        
-        # Add a default deck
-        database.add_deck(user_id, "Default", 1)
-        
-        #grab deck id
-        deck_id = database.get_deck_id_by_name("Default", user_id)
-        print(deck_id)
-        
-        #add the cards to the deck
-        for card in cards_9:
-            database.add_card_to_deck(deck_id[0], card[0])
-        
-        database.make_deck_active(user_id, deck_id)
-        
-        return result
-
-def login(username, password, client_address):
-    if(check_online_user(username)):
-        return {"status": 500, "message": "User already logged in", "command": "error"}
-    response = database.login_user(username, password)
-    
-    if(response['status'] != 200):
-        return response
-    if(response['status'] == 200):
-        logged_users[client_address] = username
-    
-    #if there is no deck active, make the first deck active
-    user_id = database.get_user_id(username)[0]
-    if(database.get_active_deck(user_id) == None):
-        deck_id = database.get_deck_id_by_name("Default", user_id)[0]
-        database.make_deck_active(user_id, deck_id)
-    
-    return response
 
 def make_deck(username, deck_name):
     user_id = database.get_user_id(username)
