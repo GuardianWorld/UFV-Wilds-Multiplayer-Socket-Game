@@ -827,7 +827,9 @@ def TelaCriarDeck(janela, todasCartas, imagemFundo, message_queue, response_queu
                         if resposta == "Deck created":
                             for i in range(9):
                                 message_queue.put(f"add_card_to_deck {nome_deck} {cartas_selecionadas[i]}")
-                                if response_queue.get() == "Card added":
+                                response = response_queue.get()
+                                print(response)
+                                if response == "Card added":
                                     continue
                                 else:
                                     # erro, mostrar um popup ou algo assim
@@ -898,7 +900,12 @@ def TelaMostrarColecao(janela, todasCartas, imagemFundo, message_queue, response
     paths = []
     for nome in todasCartas[:,0]:
         message_queue.put(f"check_card {nome}")
-        paths.append(response_queue.get()[7])
+        response = response_queue.get()
+        print(response)
+        if(len(response) < 7):
+            return
+        print(response[7])
+        paths.append(response[7])
 
     rodando_cartas = True
     while rodando_cartas:

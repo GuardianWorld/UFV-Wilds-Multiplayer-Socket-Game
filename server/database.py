@@ -114,6 +114,12 @@ def user_from_token(token):
         return None
     return get_user_by_id(user_id)
 
+def userID_from_token(token):
+    user_id, status = validate_token(token)
+    if status.get('status') != 200:
+        return None
+    return user_id
+
 def generate_token(user_id):
     payload = {
         'user_id': user_id,
@@ -371,6 +377,11 @@ def add_card_to_user(user_id, card_id):
         if(card_amount and card_amount[0] >= 3):
             conn.close()
             return {"status": 500, "message": "User already has 3 of this card", "command": "error"}
+        if(card_amount > 0):
+            c.execute('''UPDATE user_cards SET amount = amount + 1 WHERE user_id = ? AND card_id = ?''', (user_id, card_id))
+            conn.commit()
+            conn.close()
+            return {"status": 200, "message": "Success", "command": "add_card_to_user"}
         
         c.execute('''INSERT INTO user_cards (user_id, card_id, amount) VALUES (?, ?, ?)''', (user_id, card_id, 1))
         conn.commit()

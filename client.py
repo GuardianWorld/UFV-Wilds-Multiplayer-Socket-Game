@@ -8,6 +8,8 @@ import sys
 import os
 import queue
 from time import sleep
+
+import pygame
 from mainTelas import startInterface
 import Pyro5.api
 
@@ -111,34 +113,114 @@ def common_commands(message, server):
             response_queue.put("Login failed")
         return
         
-    elif(command == "match_search"):
-        send_status, json_message = match_search(token)           
     elif(command == "check_cards"):
-        json_message = {"token": token, "message": "", "command": "check_cards"}
+        status, cards = server.check_cards(token)
+        if(status == 500):
+            response_queue.put("Failed")
+            return
+        final_list = []
+        for card in cards:
+            card_name = card[0]
+            amount = card[1]
+            for i in range(amount):
+                final_list.append([card_name, 1])
+        response_queue.put(final_list)
+
     elif(command == "check_card"):
         card_name = full_message[1]
-        json_message = {"token": token, "message": "", "command": "check_card", "card_name": card_name}
+        status, card = server.check_card(token, card_name)
+        if(status == 500):
+            response_queue.put("Failed")
+            return
+        card_name = card[0]
+        forca = card[2]
+        fofura = card[3]
+        velocidade = card[4]
+        tamanho = card[5]
+        idade = card[6]
+        tipo = card[7]
+        imagem = card[8]
+        
+        response_queue.put([card_name, forca, fofura, velocidade, tamanho, idade, tipo, imagem])        
+    
+    elif(command == "check_decks"):
+        status, decks = server.check_decks(token)
+        if(status == 500):
+            response_queue.put("Failed")
+            return
+        response_queue.put(decks)
+    
+    elif(command == "check_deck"):
+        deck_name = full_message[1]
+        status, deck = server.check_deck(token, deck_name)
+        if(status == 500):
+            response_queue.put("Failed")
+            return
+        print(deck)
+        deck_name = deck[0]
+        cards = deck[1]
+        active = deck[2]
+        print(f"[*] Deck: {deck_name}, Active: {active}, Cards: {cards}")
+        response_queue.put([deck_name, active, cards])
+
+    elif command == "create_deck":
+        deck_name = full_message[1]
+        status, answer = server.create_deck(token, deck_name)
+        if(status == 500):
+            response_queue.put("Failed")
+            return
+        response_queue.put(["Deck created", deck_name])
+    
+    elif command == "delete_deck":
+        deck_name = full_message[1]
+        status, answer = server.delete_deck(token, deck_name)
+        if(status == 500):
+            response_queue.put("Failed")
+            return
+        response_queue.put(["Deck deleted", deck_name])
+        
     elif(command == "activate_deck"):
         deck_name = full_message[1]
-        json_message = {"token": token, "message": "", "command": "activate_deck", "deck_name": deck_name}
-    elif(command == "check_decks"):
-        send_status, json_message = check_decks(token)
+        status, answer = server.activate_deck(token, deck_name)
+        if(status == 500):
+            response_queue.put("Failed")
+            return
+        response_queue.put(["Activated deck", deck_name])
+        
     elif(command == "add_card_to_deck"):
-        send_status, json_message = add_card_to_deck(message, token)
+        parts = message.split(' ', 2)
+        if(len(parts) != 3):
+            response_queue.put("Invalid input")
+            return
+        deck_name = parts[1]
+        card_name = parts[2]
+        status, answer = server.add_card_to_deck(token, deck_name, card_name)
+        if(status == 500):
+            response_queue.put("Failed")
+            return
+        response_queue.put("Card added")
+        
     elif(command == "remove_card_from_deck"):
-        send_status, json_message = remove_card_from_deck(message, token)
-    elif(command == "create_deck"):
-        send_status, json_message = create_deck(message, token)
-    elif(command == "delete_deck"):
-        send_status, json_message = delete_deck(message,token)
-    elif(command == "check_deck"):
-        send_status, json_message = check_deck(message, token)
+        parts = message.split(' ', 2)
+        if(len(parts) != 3):
+            response_queue.put("Invalid input")
+            return
+        deck_name = parts[1]
+        card_name = parts[2]
+        status, answer = server.remove_card_from_deck(token, deck_name, card_name)
+        if(status == 500):
+            response_queue.put("Failed")
+            return
+        response_queue.put(["Card removed", card_name, deck_name])
+        
+    elif(command == "match_search"):
+        send_status, json_message = match_search(token)  
+        
+        
 
 def package_message(message, server, token="none"):
     global searching_for_match
     global on_match
-    json_message = {}
-    send_status = True
 
     try:
         if(on_match):
@@ -150,24 +232,6 @@ def package_message(message, server, token="none"):
         response_queue.put(["Package exception", str(e)])
     
     return
-
-
-def help():
-    # print("Commands:")
-    # print("register <username> <password>: Register a new user")
-    # print("login <username> <password>: Login with a user")
-    # print("match_search: Search for a match")
-    # print("check_cards: Check all cards")
-    # print("check_card <card_name>: Check a specific card")
-    # print("create_deck <deck_name>: Create a new deck")
-    # print("delete_deck <deck_name>: Delete a deck")
-    # print("activate_deck <deck_name>: Activate a deck")
-    # print("add_card_to_deck <deck_name> <card_name>: Add a card to a deck")
-    # print("remove_card_from_deck <deck_name> <card_name>: Remove a card from a deck")
-    # print("check_decks: Check all decks")
-    # print("check_deck <deck_name>: Check a specific deck")
-    # print("exit: Close the client")
-    response_queue.put("Help")
 
 def receive_message(client_socket):
     global stop_event
@@ -411,9 +475,11 @@ def heartbeats():
     
 #Start Client
 def start_client(host, port):
+    print("[*] Starting Up... Please wait...")
     ns = Pyro5.api.locate_ns()                           
     uri = ns.lookup("ufv_wilds.server")             
     server = Pyro5.api.Proxy(uri)    
+    
     global stop_event
     global token
     global username
@@ -428,7 +494,10 @@ def start_client(host, port):
         stop_event.set()
         return
 
-    print(f"[*] Client ID: {client_id}")
+    print(f"[*] Connected to the server.")
+    print(f"[*] Client ID: {client_id}", flush=True)
+        
+    file_checking(server, client_id)    
     
     heartbeats_thread = threading.Thread(target=heartbeats)
     heartbeats_thread.start()
@@ -465,6 +534,31 @@ def start_client(host, port):
         
 # Aux Functions
 
+def file_checking(server, client_id):
+    print(f"[*] Loading... Please wait ")
+    
+    file_list = server.get_file_list(client_id)
+    print(f"[*] There exists {len(file_list)} files.")
+    amount, missing_indexes = verify_files(file_list)
+    
+    if(amount == 0):
+        print("[*] All files are up to date.")
+    else:
+        print(f"[*] Missing {amount} files.")
+        sleep(1)
+    
+    for index in missing_indexes:
+        file = file_list[index]
+        path = os.path.join(os.getcwd(), "StreamingAssets", file[0])
+        print(f"[*] Requesting file: {file[0]}")
+        b64_file = server.request_file(client_id, file[0])
+        b64_to_image(b64_file, path)
+        sleep(0.2)
+        
+    
+    
+        
+
 def match_search(token):
     
     if(not token):
@@ -474,17 +568,6 @@ def match_search(token):
         return False, {"token": token, "message": "Already searching for match", "command": "error"}
     searching_for_match = True
     return True, {"token": token, "message": "Match Search", "command": "match_search"} 
-
-def create_deck(message, token):
-    if(not token):
-        return False, {"token": token, "message": "Not logged in", "command": "error"}
-    
-    parts = message.split(' ', 2)
-    if(len(parts) != 2):
-        return False, {"token": token, "message": "Invalid input", "command": "error"}
-    
-    deck_name = parts[1]
-    return True, {"token": token, "message": "Creating deck", "command": "create_deck", "deck_name": deck_name}
 
 def delete_deck(message, token):
     if(not token):
@@ -523,67 +606,6 @@ def remove_card_from_deck(message, token):
     card_name = parts[2]
     
     return True, {"token": token, "message": "Removing card from deck", "command": "remove_card_from_deck", "deck_name": deck_name, "card_name": card_name}
-
-def check_decks(token):
-    if(not token):
-        return False, {"token": token, "message": "Not logged in", "command": "error"}
-    return True, {"token": token, "message": "Checking decks", "command": "check_decks"}
-    
-def check_deck(message, token):
-    if(not token):
-        return False, {"token": token, "message": "Not logged in", "command": "error"}
-    
-    parts = message.split(' ', 2)
-    if(len(parts) != 2):
-        return False, {"token": token, "message": "Invalid input", "command": "error"}
-    
-    deck_name = parts[1]
-    return True, {"token": token, "message": "Checking deck", "command": "check_deck", "deck_name": deck_name}
-
-#Login Operation
-def login_operation(client_socket):
-    global login_into_server 
-    global token
-    server_files = []
-    x = 0
-    
-    login_into_server= True
-    
-    # print(f"[*] Logging in...")
-    # print(f"[*] Loading... Please wait ")
-    response_queue.put("logging in")
-    client_socket.send(json.dumps({"token": token, "message": "", "command": "request_images"}).encode())
-    while(True):
-        response = client_socket.recv(8192)
-        if not response:
-            continue
-        response = response.decode()
-        response_json = json.loads(response)
-        if(response_json == None):
-            # print(f"[*] Empty Packet")
-            response_queue.put("Empty packet")
-            continue
-        command = response_json.get('command')
-        if(command == "request_images"):
-            server_files.append((response_json.get('image'), response_json.get('checksum')))
-            client_socket.send(json.dumps({"token": token, "message": "", "command": "image_received"}).encode())
-        elif(command == "request_images_end"):
-            # print(f"[*] There exists {len(server_files)} files.")
-            amount, missing_indexes = verify_files(server_files)
-            if(amount == 0):
-                print("[*] All files are up to date.")
-                break
-            else:
-                # print(f"[*] Missing {amount} files.")
-                sleep(2)
-                download_files(client_socket, missing_indexes, amount, server_files, token)
-                client_socket.send(json.dumps({"token": token, "message": "", "command": "login_finish"}).encode())
-                break
-        else:
-            # print(f"[*] Unknown command: {command} {response_json.get('message')}")
-            continue
-            
-    login_into_server = False
                       
 def download_files(client_socket, missing_indexes, amount, server_files, token):
     x = 0

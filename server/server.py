@@ -15,7 +15,7 @@ import queue
 
 
 import database
-from config import stop_event, logged_users, match_rooms, log_event_level, delay_for_lag
+from config import stop_event, match_rooms, log_event_level
 import match
 
 files = []
@@ -99,14 +99,13 @@ class UFVWildsServer:
         database.make_deck_active(user_id, deck_id)
         
         return 200, f"User {username} registered sucessfully."
-        
-        
+            
     def login(self, username, password, client_id):
         if(log_event_level >= 1):
             print(f"[*] Login request received, User: {username}")
         Token = ""
         
-        if(check_online_user(username)):
+        if(check_online_user(username, self.logged_users)):
             return 500, ""
         response = database.login_user(username, password)
         status = response['status']
@@ -135,12 +134,144 @@ class UFVWildsServer:
             del self.logged_users[client_id]
         return "Goodbye!"
     
+    # Card Management
+    def check_cards(self, token):
+        if(not token):
+            return 500, "Invalid Token."
+        
+        user_id = database.userID_from_token(token)
+        print(user_id)
+        cards_from_user_cards = database.get_user_cards(user_id)
+        card_list = []
+        for card_v in cards_from_user_cards:
+            #Get the card Name
+            card_id = card_v[2]
+            
+            card = database.get_card_by_id(card_id)
+            card_amount = database.get_card_amount(token, card_id)
+            card_name = card[1]
+            
+            card_list.append((card_name, card_amount))
+            
+        return 200, card_list
+    
+    def check_card(self, token, card_name):
+        if(not token):
+            return 500, "Invalid Token."
+        
+        response = database.get_card_info(card_name)    
+        card = [response["card_name"], response["card_group"], response["forca"], response["fofura"], response["velocidade"], response["tamanho"], response["idade"], response["tipo"], response["imagem"]]
+        return 200, card
+    
+    def check_decks(self, token):
+        if(not token):
+            return 500, "Invalid Token."
+        
+        user_id = database.userID_from_token(token)
+        decks = database.get_user_decks(user_id)
+        return 200, decks
+    
+    def check_deck(self, token, deck_name):
+        if(not token):
+            return 500, "Invalid Token."
+   
+        user_id = database.userID_from_token(token)
+        deck_id = database.get_deck_id_by_name(deck_name, user_id)
+        if(deck_id == None):
+            return 500, "Deck not found."
+        response = database.get_deck_info(token, deck_id[0])
+        deck_info = [deck_name, response['cards'], response['active']]
+        return 200, deck_info
+    
+    def activate_deck(self, token, deck_name):
+        if(not token):
+            return 500, "Invalid Token."
+        
+        user_id = database.userID_from_token(token)
+        deck_id = database.get_deck_id_by_name(deck_name, user_id)
+        if(deck_id == None):
+            return 500, "Deck not found."
+        response = database.make_deck_active(user_id, deck_id[0])
+        if(response['status'] == 200):
+            return 200, "Deck activated."
+        return 500, "Error activating deck."
+    
+    def create_deck(self, token, deck_name):
+        if(not token):
+            return 500, "Invalid Token."
+        
+        user_id = database.userID_from_token(token)
+        response = database.add_deck(user_id, deck_name)
+        if(response['status'] == 200):
+            return 200, "Deck created."
+        return 500, "Error creating deck."
+    
+    def delete_deck(self, token, deck_name):
+        if(not token):
+            return 500, "Invalid Token."
+        
+        user_id = database.userID_from_token(token)
+        deck_id = database.get_deck_id_by_name(deck_name, user_id)
+        if(deck_id == None):
+            return 500, "Deck not found."
+        response = database.delete_deck(deck_id[0])
+        if(response['status'] == 200):
+            return 200, "Deck deleted."
+        return 500, "Error deleting deck."
+    
+    def add_card_to_deck(self, token, deck_name, card_name):
+        if(not token):
+            return 500, "Invalid Token."
+        print(deck_name, card_name)
+        user_id = database.userID_from_token(token)
+        deck_id = database.get_deck_id_by_name(deck_name, user_id)
+        if(deck_id == None):
+            return 500, "Deck not found."
+        card_id = database.get_card_id(card_name)[0]
+        if(card_id == None):
+            return 500, "Card not found."
+        card_on_player = database.get_card_amount(user_id, card_id)
+        print(card_on_player)
+        if(card_on_player == 0):
+            return 500, "Card not found in player's collection."
+        response = database.add_card_to_deck(deck_id[0], card_id)
+        if(response['status'] == 200):
+            return 200, "Card added to deck."
+        return 500, "Error adding card to deck."
+    
+    def remove_card_from_deck(self, token, deck_name, card_name):
+        if(not token):
+            return 500, "Invalid Token."
+        
+        user_id = database.userID_from_token(token)
+        deck_id = database.get_deck_id_by_name(deck_name, user_id)
+        if(deck_id == None):
+            return 500, "Deck not found."
+        card_id = database.get_card_id(card_name)
+        if(card_id == None):
+            return 500, "Card not found."
+        response = database.remove_card_from_deck(deck_id[0], card_id)
+        if(response['status'] == 200):
+            return 200, "Card removed from deck."
+        return 500, "Error removing card from deck."
+    
     #Download Management
-    def request_images(self, client_id):
+    def get_file_list(self, client_id):
+        if(log_event_level >= 5):
+            print(f"[*] File List send to {client_id}")
+        if(client_id):
+            return files
+        return None
+    
+    def request_file(self, client_id, image_path):
         if(log_event_level >= 5):
             print(f"[*] Image request received from {client_id}")
-        response = {"status": 200, "message": "Images received", "command": "request_images", "images": files}
-        return response
+        if(client_id):
+            image_path = getcwd() + "/StreamingAssets/" + image_path
+            return image_to_b64(image_path)
+        return None
+    
+    
     
 def heartbeat_thread(server):
     while not stop_event.is_set():
@@ -521,7 +652,7 @@ def terminal_kick():
 #endregion
 
 
-def check_online_user(username):
+def check_online_user(username, logged_users):
     for connection, user in logged_users.items():
         if user == username:
             return True
