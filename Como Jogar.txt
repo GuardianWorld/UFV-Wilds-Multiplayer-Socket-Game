@@ -7,13 +7,18 @@ Primeiro:
 - Existem duas versões, a de termina e a de UI
 
 Então vamos la!
-Se for jogar, primeiro, faça o comando:
+
+Em um terminal, faça o pyro nameserver iniciar:
+
+> make pyro
+
+A seguir, faça o comando:
 
 > make server
 
-ele ira instalar o VENV, e seus requirements, e iniciar o servidor.
+ele ira iniciar o servidor.
 
-a seguir, apenas faça
+então: 
 
 >make client
 

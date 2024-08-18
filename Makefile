@@ -27,10 +27,10 @@ venv:
 install: venv
 	$(PIP) install -r requirements.txt
 
-pyro:
+pyro: venv
 	$(PYTHON) -m Pyro5.nameserver
 
-server: install pyro
+server: install
 	$(PYTHON) server/server.py 
 
 client: install
