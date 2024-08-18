@@ -225,7 +225,7 @@ def turn(first_player, second_player, third_player):
     return first_player, second_player, third_player
 
 def match_end(p1, p2, p3):
-    if(len(p1['cards']) == 5 or len(p2['cards']) == 5 or len(p3['cards']) == 5):
+    if(len(p1['cards']) == 0 or len(p2['cards']) == 0 or len(p3['cards']) == 0):
         return True
     return False
 
