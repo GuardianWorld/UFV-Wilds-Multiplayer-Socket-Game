@@ -6,20 +6,22 @@ import threading
 import time
 import signal
 import database
+import Pyro5.api
 
-from config import active_connections, logged_users, stop_event, searching_for_match, match_rooms, log_event_level, delay_for_lag
+from config import stop_event, match_rooms, log_event_level, delay_for_lag
 
-def search_match():
+def search_match(ufv_wilds_server):
     print("[*] Matchmaking Server Started.")
     matched_players = []
     while not stop_event.is_set():
-        if(len(searching_for_match) >= 3):
-            matched_players = random.sample(list(searching_for_match.items()), 3)
+        #print(len(ufv_wilds_server.searching_for_match))
+        if(len(ufv_wilds_server.searching_for_match) >= 3):
+            matched_players = random.sample(list(ufv_wilds_server.searching_for_match.items()), 3)
             player1 = matched_players[0]
             player2 = matched_players[1]
             player3 = matched_players[2]
             for player in matched_players:
-                del searching_for_match[player[0]]
+                del ufv_wilds_server.searching_for_match[player[0]]
             match_rooms.append((player1[0], player2[0], player3[0]))                    
             # make a new thread for the match
             match_thread = threading.Thread(target=play_field, args=(player1,player2,player3))
@@ -64,9 +66,9 @@ def players_info(p1,p2,p3):
     player3_hand = random.sample(player3_cards, 3)
     player3_cards = [card for card in player3_cards if card not in player3_hand]
     
-    player1 = {"name": p1[0], "socket": p1[1], "id": player1_id, "cards": player1_cards, "hand": player1_hand}
-    player2 = {"name": p2[0], "socket": p2[1], "id": player2_id, "cards": player2_cards, "hand": player2_hand}
-    player3 = {"name": p3[0], "socket": p3[1], "id": player3_id, "cards": player3_cards, "hand": player3_hand}
+    player1 = {"name": p1[0], "URI": p1[1], "id": player1_id, "cards": player1_cards, "hand": player1_hand}
+    player2 = {"name": p2[0], "URI": p2[1], "id": player2_id, "cards": player2_cards, "hand": player2_hand}
+    player3 = {"name": p3[0], "URI": p3[1], "id": player3_id, "cards": player3_cards, "hand": player3_hand}
     
     return player1, player2, player3
 
@@ -340,7 +342,7 @@ def send_message(player, encoded_message):
 
 def play_field(p1, p2, p3): 
     
-    player1, player2, player3 = players_info(p1,p2,p3)
+    player1, player2, player3 = players_info(p1,p2,p3) #oki doki
     first_player, second_player, third_player = play_order(player1, player2, player3)
     
     if(log_event_level >= 4):

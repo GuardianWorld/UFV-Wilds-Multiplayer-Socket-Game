@@ -194,19 +194,23 @@ def TelaCarregamento(janela, pathImagemTelaPrincipal, message_queue, response_qu
     texto_carregando = fonte.render('Carregando...', True, CINZA)
     texto_rect = texto_carregando.get_rect(center=(largura_tela // 2, altura_tela // 2))
 
-    message_queue.put("match_search")
-    resposta = response_queue.get()
-
     while True:
+        message_queue.put("match_search")
+        
         janela.blit(imagem_fundo, (0, 0))  # Desenha a imagem de fundo
         janela.blit(texto_carregando, texto_rect)  # Desenha a mensagem "Carregando..."
 
         pygame.display.flip()
 
-        if(resposta[0] == "Match started"):
-            return 1
-        elif(not response_queue.empty()):
+        if(not response_queue.empty()):
             resposta = response_queue.get()
+            try:
+                if(resposta[0] == "Match started"):
+                    return 1
+            except:
+                pass
+        
+        
 
         # Eventos
         for event in pygame.event.get():

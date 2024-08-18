@@ -81,6 +81,7 @@ def startInterface(message_queue, response_queue):
                         else:
                             break
                 else:
+                    print("Entrou no else")
                     respostaTelaCarregamento = TelaCarregamento(janela, pathImagemTelaPrincipal, message_queue, response_queue)
                     
                     while(True):

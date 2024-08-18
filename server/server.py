@@ -30,7 +30,6 @@ signal.signal(signal.SIGTERM, signal_handler)
 @Pyro5.api.expose
 class UFVWildsServer:
     def __init__(self):
-        self.client_queues = {}
         self.clients = []
         self.logged_users = {}
         self.heartbeats = {}
@@ -42,14 +41,13 @@ class UFVWildsServer:
         #make unique ID
         client_id = hashlib.md5(str(datetime.datetime.now()).encode()).hexdigest()
         self.clients.append(client_id)
-        self.client_queues[client_id] = queue.Queue()
         return client_id
     
     def heartbeats_check(self):
         try:
             current_time = time.time()
             for client_id, _time in self.heartbeats.items():
-                if(current_time - _time > 60):
+                if(current_time - _time > 5):
                     print(f"[*] Client {client_id} timed out.")
                     self.logoff(client_id)
         except Exception as e:
@@ -80,10 +78,11 @@ class UFVWildsServer:
             return 500, "Error: User not added."
         
         user_id = database.get_user_id(username)[0]
+        print("User ID: ", user_id)
         cards_9 = database.get_9_random_cards()
         # Add the cards to the new user
         for card in cards_9:
-            database.add_card_to_user(user_id, card[0])
+            result = database.add_card_to_user(user_id, card[0])
             
         # Add a default deck
         database.add_deck(user_id, "Default", 1)
@@ -109,29 +108,40 @@ class UFVWildsServer:
             return 500, ""
         response = database.login_user(username, password)
         status = response['status']
-        if(response['status'] == 200):
+        if(status == 200):
             if(log_event_level >= 1):
                 print(f"[*] User {username} logged in.")
+            
             Token = response.get('token')
-            self.logged_users[client_id] = Token
+            self.logged_users[client_id] = username
+            
+            for client_id, usr in self.logged_users.items():
+                print(usr)                
             
             #Check if user has active decks.
             user_id = database.get_user_id(username)[0]
             if(database.get_active_deck(user_id) == None):
                 deck_id = database.get_deck_id_by_name("Default", user_id)[0]
                 database.make_deck_active(user_id, deck_id)
-        
+                
         return status, Token
     
     def logoff(self, client_id):
+        username = ""
+        print(f"[*] Logoff request received from {client_id}")
         if client_id in self.heartbeats:
+            print(f"[*] Client {client_id} flatlined.")
             del self.heartbeats[client_id]
-        if client_id in self.client_queues:
-            del self.client_queues[client_id]
         if client_id in self.clients:
+            print(f"[*] Client {client_id} removed from client list.")
             self.clients.remove(client_id)
         if client_id in self.logged_users:
+            username = self.logged_users[client_id]
+            print(f"[*] User {self.logged_users[client_id]} logged off.")
             del self.logged_users[client_id]
+        if username in self.searching_for_match:
+            print(f"[*] User {username} removed from match search.")
+            del self.searching_for_match[username]
         return "Goodbye!"
     
     # Card Management
@@ -140,7 +150,6 @@ class UFVWildsServer:
             return 500, "Invalid Token."
         
         user_id = database.userID_from_token(token)
-        print(user_id)
         cards_from_user_cards = database.get_user_cards(user_id)
         card_list = []
         for card_v in cards_from_user_cards:
@@ -168,6 +177,8 @@ class UFVWildsServer:
             return 500, "Invalid Token."
         
         user_id = database.userID_from_token(token)
+        if not user_id:
+            return 500, "Invalid Token."
         decks = database.get_user_decks(user_id)
         return 200, decks
     
@@ -176,6 +187,8 @@ class UFVWildsServer:
             return 500, "Invalid Token."
    
         user_id = database.userID_from_token(token)
+        if not user_id:
+            return 500, "Invalid Token."
         deck_id = database.get_deck_id_by_name(deck_name, user_id)
         if(deck_id == None):
             return 500, "Deck not found."
@@ -188,6 +201,8 @@ class UFVWildsServer:
             return 500, "Invalid Token."
         
         user_id = database.userID_from_token(token)
+        if not user_id:
+            return 500, "Invalid Token."
         deck_id = database.get_deck_id_by_name(deck_name, user_id)
         if(deck_id == None):
             return 500, "Deck not found."
@@ -211,6 +226,8 @@ class UFVWildsServer:
             return 500, "Invalid Token."
         
         user_id = database.userID_from_token(token)
+        if not user_id:
+            return 500, "Invalid Token."
         deck_id = database.get_deck_id_by_name(deck_name, user_id)
         if(deck_id == None):
             return 500, "Deck not found."
@@ -224,6 +241,8 @@ class UFVWildsServer:
             return 500, "Invalid Token."
         print(deck_name, card_name)
         user_id = database.userID_from_token(token)
+        if not user_id:
+            return 500, "Invalid Token."
         deck_id = database.get_deck_id_by_name(deck_name, user_id)
         if(deck_id == None):
             return 500, "Deck not found."
@@ -244,6 +263,8 @@ class UFVWildsServer:
             return 500, "Invalid Token."
         
         user_id = database.userID_from_token(token)
+        if not user_id:
+            return 500, "Invalid Token."
         deck_id = database.get_deck_id_by_name(deck_name, user_id)
         if(deck_id == None):
             return 500, "Deck not found."
@@ -254,6 +275,31 @@ class UFVWildsServer:
         if(response['status'] == 200):
             return 200, "Card removed from deck."
         return 500, "Error removing card from deck."
+
+    #match search
+
+    def match_search(self, token, client_id, URI):
+        if(not token):
+            return 500, "Invalid Token."
+        
+        username = self.logged_users[client_id]
+        if not username:
+            return 500, "Invalid User."
+        if(username in self.searching_for_match):
+            return 500, "Already searching for match."
+        
+        print(f"[*] Match search request received from {username}")
+        self.searching_for_match[username] = URI
+        
+        try:
+            print(f"[*] Sending match search request to {URI}")
+            client_proxy = Pyro5.api.Proxy(URI)
+            client_proxy.match_search()
+        except Exception as e:
+            print(f"Error: {e}")
+            return 500, "Error searching for match."
+        
+        return 200, "Searching for match."
     
     #Download Management
     def get_file_list(self, client_id):
@@ -280,8 +326,6 @@ def heartbeat_thread(server):
 
 #Start Server
 def start_server(host, port):
-    
-
     print("[*] Starting server...")
     print("[*] Loading StreamingAssets...")
     time.sleep(1)
@@ -309,11 +353,11 @@ def start_server(host, port):
     uri = daemon.register(ufv_wilds_server)
     ns.register("ufv_wilds.server", uri)
     
-    terminal = threading.Thread(target=internal_server_terminal)
+    terminal = threading.Thread(target=internal_server_terminal, args=(ufv_wilds_server,))
     terminal.start()
     
-    #match_thread = threading.Thread(target=match.search_match)
-    #match_thread.start()
+    match_thread = threading.Thread(target=match.search_match, args=(ufv_wilds_server,))
+    match_thread.start()
     
     heartbeat = threading.Thread(target=heartbeat_thread, args=(ufv_wilds_server,))
     heartbeat.start()
@@ -340,7 +384,7 @@ def shutdown_server(timeout=5):
 
 # region Internal Server Terminal
 
-def internal_server_terminal():
+def internal_server_terminal(ufv_wilds_server):
     global log_event_level
     print("[*] Server terminal started.")
     while not stop_event.is_set():
@@ -350,23 +394,19 @@ def internal_server_terminal():
                 print("[*] Shutdown command issued, stopping...")
                 stop_event.set()
             elif command == "status":
-                terminal_status()
+                terminal_status(ufv_wilds_server.clients, ufv_wilds_server.logged_users, ufv_wilds_server.searching_for_match) 
             elif command == "statistics":
                 terminal_stats()
-            elif command == "connections":
-                terminal_comms()
             elif command == "users":
-                terminal_users()
+                terminal_users(ufv_wilds_server.logged_users)
             elif command == "matches":
                 terminal_matches()
             elif command == "searching":
-                terminal_searching()
+                terminal_searching(ufv_wilds_server.searching_for_match)
             elif command == "database search":
                 terminal_search()
             elif command == "config":
-                terminal_config() 
-            elif command == "kick":
-                terminal_kick()    
+                terminal_config()    
             elif command == "ban":
                 terminal_user_ban()      
             elif command == "delete user":
@@ -376,13 +416,11 @@ def internal_server_terminal():
                 print(" >> shutdown - Stops the server.")
                 print(" >> status - Shows server status.")
                 print(" >> statistics - Shows server statistics.")
-                print(" >> connections - Shows active connections.")
                 print(" >> users - Shows online users.")
                 print(" >> matches - Shows current matches.")
                 print(" >> searching - Shows users searching for match.")
                 print(" >> database search - Search the database for information.")
                 print(" >> config - Shows server configuration.")
-                print(" >> kick - Kicks a user.")
                 print(" >> ban - Ban/Unbans a user.")
                 print(" >> delete user - Deletes a user.")
                 print(" >> help - Shows this message.")
@@ -435,10 +473,9 @@ def terminal_config():
         elif(command == "all cards"):
             all_cards()
 
-def terminal_status():
-    number_of_sockets = len(active_connections)
+def terminal_status(connections, logged_users, searching_for_match):
     print("[*] Server is running.")
-    print(f"[*] Number of sockets open: {number_of_sockets}")
+    print(f"[*] Number of connections open: {len(connections)}")
     print(f"[*] Number of users online: {len(logged_users)}")
     print(f"[*] Number of match rooms: {len(match_rooms)}")
     print(f"[*] Searching for match: {len(searching_for_match)}")
@@ -450,13 +487,8 @@ def terminal_stats():
     print(f"[*] Number of Matches: {database.get_statistics_matches()[0]}")
     print(f"[*] Number of Banned Users: {database.get_statistics_banned()[0]}")   
 
-def terminal_comms():
-    print(f"[*] Active connections: ")
-    for connection, socket_time_pair in active_connections.items():
-        print(f" -> {connection[0]}:{connection[1]} - {socket_time_pair[1]}")
-
-def terminal_users():
-    number_of_logged_users = len(logged_users)
+def terminal_users(log):
+    number_of_logged_users = len(log)
     number_of_users = database.get_statistics_user()[0]
     print("[*] Number of Users: ", number_of_users)
     print("[*] Number of Users Online: ", number_of_logged_users)
@@ -464,8 +496,8 @@ def terminal_users():
     value = input("[users] >> ")
     if(value == "y"):
         print("[*] Online users:")
-        for connection, user in logged_users.items():
-            print(f" -> {connection[0]}:{connection[1]} [{user}]")
+        for token, user in log.items():
+            print(f" -> {user}")
         if(number_of_logged_users == 0):
             print(" -> No users online.")
     print("[*] Show all users? [y/n]: ")
@@ -483,7 +515,7 @@ def terminal_matches():
     for room, players in match_rooms.items():
         print(f" -> Room {room}: {players}")
 
-def terminal_searching():
+def terminal_searching(searching_for_match):
     print(f"[*] Searching for match: {len(searching_for_match)}")
     for player, player_socket in searching_for_match.items():
         print(f" -> {player}")
@@ -627,88 +659,14 @@ def terminal_user_ban():
     
     print("Operation canceled.")
 
-def terminal_kick():
-    print("[*] Disconnects a user by username.")
-    username = input("[kick] >> Username: ")
-    reason = input("[kick] >> Reason: ")
-    
-    for client_address, user in logged_users.items():
-        if user == username:
-            client_socket = (active_connections[client_address])[0]
-            
-            client_socket.send(json.dumps({"status": 200, "message": reason, "command": "serverside_logoff"}).encode())
-            #remove from connections
-            client_socket.close()
-            del active_connections[client_address]
-            #delete from logged users
-            del logged_users[client_address]
-            print(f"[*] User {username} kicked.")
-            #del from match search
-            if(match.player_searching(username)):
-                del searching_for_match[username]
-            return
-    
-
 #endregion
 
 
 def check_online_user(username, logged_users):
-    for connection, user in logged_users.items():
+    for token, user in logged_users.items():
         if user == username:
             return True
     return False
-
-def make_deck(username, deck_name):
-    user_id = database.get_user_id(username)
-    if(user_id == None):
-        return {"status": 500, "message": "User not found", "command": "error"}
-    return database.add_deck(user_id, deck_name)
-    
-def check_decks(username):
-    user_id = database.get_user_id(username)[0]
-    if(user_id == None):
-        return {"status": 500, "message": "User not found", "command": "error"}
-    
-    decks = database.get_user_decks(user_id)
-    if(decks == None):
-        return {"status": 500, "message": "No decks found", "command": "error"}
-    
-    return {"status": 200, "message": "decks found:", "command": "check_decks", "decks": decks}
-
-
-def add_card_to_deck(username, deck_name, card_name):
-    user_id = database.get_user_id(username)
-    if(user_id == None):
-        return {"status": 500, "message": "User not found", "command": "error"}
-    
-    deck_id = database.get_deck_id_by_name(user_id, deck_name)
-    if(deck_id == None):
-        return {"status": 500, "message": "Deck not found", "command": "error"}
-    
-    card_id = database.get_card_id(card_name)
-    if(card_id == None):
-        return {"status": 500, "message": "Card not found", "command": "error"}
-    
-    #check if deck has less than 9 cards
-    if(database.get_deck_size(deck_id) >= 9):
-        return {"status": 500, "message": "Deck is full", "command": "error"}
-    
-    return database.add_card_to_deck(deck_id, card_id)
-
-def remove_card_from_deck(username, deck_name, card_name):
-    user_id = database.get_user_id(username)
-    if(user_id == None):
-        return {"status": 500, "message": "User not found", "command": "error"}
-    
-    deck_id = database.get_deck_id_by_name(user_id, deck_name)
-    if(deck_id == None):
-        return {"status": 500, "message": "Deck not found", "command": "error"}
-    
-    card_id = database.get_card_id(card_name)
-    if(card_id == None):
-        return {"status": 500, "message": "Card not found", "command": "error"}
-    
-    return database.remove_card_from_deck(deck_id, card_id)
 
 # Server-side commands
 def add_cards():

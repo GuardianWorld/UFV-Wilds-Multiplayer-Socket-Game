@@ -19,56 +19,67 @@ username = ""
 login_into_server = False
 searching_for_match = False
 on_match = False
-on_turn = False
 downloading_file = False
 client_id = ""
+ns = None
+client_uri = None
 
+@Pyro5.api.expose
+class Client:
+    def __init__(self):
+        pass
+    
+    def match_search(self):
+        print("[*] Searching for a match.")
+    
+    def match_start(self, player_1, player_2, player_3):
+        global on_match
+        print(f"[*] Match started between {player_1}, {player_2} and {player_3}")
+        response_queue.put(["Match started", player_1, player_2, player_3])
+        on_match = True
+    def match_end(self, client_handler):
+        print("[*] Match ended.")
+        response_queue.put("Match ended")
+        Pyro5.api.Daemon().unregister(client_handler)
+        on_match = False
+    def select_attribute(self):
+        global on_turn
+        print("[*] Select an attribute.")
+        response_queue.put("Select attribute")
+    def select_card(self, attribute):
+        response_queue.put("Select card")
+        response_queue.put(attribute)
+    def your_turn(self):
+        response_queue.put("Your turn")
+    def opponent_turn(self):
+        response_queue.put("Opponent turn")
+    def turn_end(self, winner):
+        response_queue.put(["Turn ended", winner])
+    def card_hand(self, hand):
+        response_queue.put(hand)
+    def reward(self, reward):
+        response_queue.put(reward)
+    def error(self, message):
+        response_queue.put(["Error", message])
+        
+    
+    
+    
+    
 
 def close_connection(client_socket):
     print("[*] Disconnected from server.")
-    
     client_socket.close()
-    
-def match_commands(message, token):
-    full_message = message.split(' ', 1)
-    command = full_message[0]
-    json_message = {}
-    send_status = True
-    if(command == "select_attribute"):
-        attribute = full_message[1]
-        json_message = {"token": token, "message": "", "command": "select_attribute", "attribute": attribute}
-    if(command == "select_card"):
-        card_name = full_message[1]
-        json_message = {"token": token, "message": "", "command": "select_card", "card_name": card_name}
-    if(command == "forfeit"):
-        json_message = {"token": token, "message": "", "command": "forfeit"}
-    if(command == "check_card"):
-        card_name = full_message[1]
-        json_message = {"token": token, "message": "", "command": "check_card", "card_name": card_name}
-    if(command == "help"):
-        # print("Commands: ")
-        # print("select_attribute <attribute>: Select an attribute to play")
-        # print("select_card <card>: Select a card to play")
-        # print("forfeit: Forfeit the match")
-        # print("check_card <card_name>: Check a specific card")
-        response_queue.put("Match help")
-        send_status = False
-        json_message = {"token": token, "message": "", "command": "chat"}
-        
-    return send_status, json_message
-    
+ 
 def common_commands(message, server):
     global token
+    global on_match
     global username
     global client_id
     full_message = message.split(' ', 1)
     command = full_message[0]
     
-    
-    
-    if(command == "exit"):
-        json_message = {"token": token, "message": "", "command": "logoff"}
-    elif(command == "register"):
+    if(command == "register"):
         if(token):
             print("[*] Already logged in")
             return
@@ -111,10 +122,10 @@ def common_commands(message, server):
             response_queue.put("logging in")     
         else:
             response_queue.put("Login failed")
-        return
-        
+        return       
     elif(command == "check_cards"):
         status, cards = server.check_cards(token)
+        print(status, cards)
         if(status == 500):
             response_queue.put("Failed")
             return
@@ -212,256 +223,39 @@ def common_commands(message, server):
             response_queue.put("Failed")
             return
         response_queue.put(["Card removed", card_name, deck_name])
-        
+    
+    elif(command == "exit"):
+        response = server.logoff(client_id,token)
     elif(command == "match_search"):
-        send_status, json_message = match_search(token)  
+        on_match = True
+
+        
+        try:
+            global client_uri
+            status, response = server.match_search(token, client_id, client_uri)
+        except Exception as e:
+            print(f"[*] Match Search Exception: {str(e)}")
+            on_match = False
+            exit(0)
+        
         
         
 
-def package_message(message, server, token="none"):
+def package_message(message, server):
     global searching_for_match
     global on_match
-
+        
     try:
-        if(on_match):
-            match_commands(message, server)
-        else:
-            common_commands(message, server)
+        common_commands(message, server)
     except Exception as e:
         print(f"[*] Package Exception: {str(e)}")
         response_queue.put(["Package exception", str(e)])
     
     return
 
-def receive_message(client_socket):
-    global stop_event
-    global username
-    global token
-    global on_match
-    global login_into_server
-    global searching_for_match
-    
-    response_json = {}
-    data = b""
-    while not stop_event.is_set():
-        try:
-            response = client_socket.recv(8192)
-            if not response:
-                continue
-
-            data += response
-            try:
-                response_json = json.loads(data.decode())
-            except json.JSONDecodeError:
-                continue
-            
-            data = b""
-            
-            #response_json = json.loads(response)
-            if(response_json == None):
-                print(f"[*] Empty Packet")
-                response_queue.put("Empty packet")
-                continue
-            
-            print("recebido:", response_json)
-            message = response_json.get('message')
-            command = response_json.get('command')
-
-            # print(str(response_json))
-            # print(message)
-            # print(command)
-            
-            # print(f"[*] Received: {response_json}")
-            if(command == "ping"):
-                continue
-
-            elif(command == "login"):
-                token = response_json.get('token')
-                username = response_json.get('username')
-                login_operation(client_socket)
-                
-            
-            elif(command == "logoff"):
-                print(f"[*] Turning off")
-                response_queue.put("Turning off")
-                sleep(0.5)
-                stop_event.set()
-                return
-            
-            elif(command == "serverside_logoff"):
-                reason = response_json.get('message')
-                print(f"[*] You have been disconnected from the server.")
-                # print(f"[*] Reason: {reason}")
-                response_queue.put(["You have been disconnected", reason])
-                sleep(1)
-                stop_event.set()
-                return
-            
-            elif(command == "check_card"):
-                card_name = response_json.get('card_name')
-                forca = response_json.get('forca')
-                fofura = response_json.get('fofura')
-                velocidade = response_json.get('velocidade')
-                tamanho = response_json.get('tamanho')
-                idade = response_json.get('idade')
-                tipo = response_json.get('tipo')
-                imagem = response_json.get('imagem')
-                # print(" > Card: ", card_name)
-                # print(" > Forca: ", forca)
-                # print(" > Fofura: ", fofura)
-                # print(" > Velocidade: ", velocidade)
-                # print(" > Tamanho: ", tamanho)
-                # print(" > Idade: ", idade)
-                # print(" > Tipo: ", tipo)
-                # print(" > Imagem: ", imagem)
-                response_queue.put([card_name, forca, fofura, velocidade, tamanho, idade, tipo, imagem])
-            
-            elif(command == "check_cards"):
-                # cards = response_json.get('cards')
-                # for card in cards:
-                    # print(f"[*] Card: {card[0]} Amount: {card[1]}")
-                response_queue.put(response_json.get('cards'))
-            
-            elif(command == "create_deck"):
-                deck_name = response_json.get('deck_name')
-                # print(f"[*] Deck {deck_name} created")
-                response_queue.put(["Deck created", deck_name])
-            
-            elif(command == "delete_deck"):
-                deck_name = response_json.get('deck_name')
-                # print(f"[*] Deck {deck_name} deleted")
-                response_queue.put(["Deck deleted", deck_name])
-            
-            elif(command == "check_decks"):
-                # decks = response_json.get('decks')
-                # for deck in decks:
-                    # grab out the ID, Name, User ID, Active and default
-                    # deck_id, deck_name, user_id, active, default = deck
-                    # if(active == 1):
-                    #     active = "Yes"
-                    # else:
-                    #     active = "No"
-                    # if(default == 1):
-                    #     default = "Yes"
-                    # else:
-                    #     default = "No"
-                    # print(f"[*] Deck Name: {deck_name}, Active: {active}, Default: {default}")
-                response_queue.put(response_json.get('decks'))
-
-            elif(command == "check_deck"):
-                deck_name = response_json.get('deck_name')
-                cards = response_json.get('cards')
-                active = response_json.get('active')
-                
-                # print(f"[*] Deck: {deck}, Active: {active}")
-                # for card in cards:
-                #     print(f"[*] Card: {card}")
-                response_queue.put([deck_name, active, cards])
-            
-            elif(command == "activate_deck"):
-                deck_name = response_json.get('deck_name')
-                # print(f"[*] Deck {deck_name} activated")
-                response_queue.put(["Activated deck", deck_name])
-                
-            elif(command == "add_card_to_deck"):
-                card_name = response_json.get('card_name')
-                deck_name = response_json.get('deck_name')
-                # print(f"[*] Card {card_name} added to deck {deck_name}")
-                response_queue.put("Card added", card_name, deck_name)
-                
-            elif(command == "remove_card_from_deck"):
-                card_name = response_json.get('card_name')
-                deck_name = response_json.get('deck_name')
-                # print(f"[*] Card {card_name} removed from deck {deck_name}")
-                response_queue.put(["Card removed", card_name, deck_name])
-                
-            #Match Commands    
-            elif(command == "match_start"):
-                searching_for_match = False
-                player_1 = response_json.get('player_1')
-                player_2 = response_json.get('player_2')
-                player_3 = response_json.get('player_3')
-                # print("\n")
-                # print(f"[*] Match started between {player_1}, {player_2} and {player_3}")
-                response_queue.put(["Match started", player_1, player_2, player_3])
-                on_match = True
-            elif(command == "match_end"):
-                on_match = False
-                # print(f"[*] Match ended.")
-                # print(f"[*] {message}")
-                response_queue.put("Match ended")
-            elif(command == "error"):
-                # print(f"[*] Error: {message}")
-                response_queue.put(["Error", message])
-            elif(command == "select_attribute"):
-                # print(f"[*] Select a attribute")
-                # print(f"[*] Attributes: Forca, Fofura, Velocidade, Tamanho, Idade, Tipo")
-                response_queue.put("Select attribute")
-            elif(command == "select_card"):
-                attribute_in_play = response_json.get('attribute')
-                hand = response_json.get('hand')
-                # print(f"[*] Select a card")
-                # print(f"[*] Attribute in play: {attribute_in_play}")
-                response_queue.put("Select card")
-                response_queue.put(attribute_in_play)
-                # x = 0
-                # for card, card_value in hand:
-                #     print(f"[*] Card: {card[1]} Value: {card_value}")
-                #     x += 1
-            elif(command == "your_turn"):
-                # print(f"[*] Your turn")
-                response_queue.put("Your turn")
-            elif(command == "opponent_turn"):
-                # print(f"[*] Opponent turn")
-                response_queue.put("Opponent turn")
-            elif(command == "turn_end"):
-                winner = response_json.get('winner')
-                # print(f"[*] Turn ended")
-                # print(f"[*] Winner: {winner}")
-                # print(f"[*] {message}")
-                response_queue.put(["Turn ended", winner])
-                
-            elif(command == "reward"):
-                reward = response_json.get('card')
-                # print(f"[*] Reward: {response_json.get('card')}") 
-                response_queue.put(reward)
-            elif(command == "card_hand"):
-                hand = response_json.get('hand')  
-                cards = response_json.get('cards')
-                # print(f"[*] Remaining in deck: {cards}")
-                # for card in hand:
-                #     print(f"[*] Card: {card[1]}")
-                response_queue.put([cards, hand])
-            elif(command == "msg"):                    
-                sender = response_json.get('sender')
-                message = response_json.get('message')
-                if(sender != username):
-                    # print(f"\n[*] Message from {sender}: {message}")
-                    response_queue.put(["Message from", sender, message])
-            else:
-                # print(f"[*] Message: {message}")    
-                response_queue.put(["Message", message])
-        except KeyboardInterrupt:
-            # print("\n[*] User interruption.")
-            response_queue.put("User interruption")
-            stop_event.set()
-            exit(0)
-        except Exception as e:
-            # print(f"[*] Receive Exception: {str(e)}")\
-            response_queue.put(["Receive exception", str(e)])
-            sleep(4)
-            stop_event.set()
-            return
-
-def match_handler(client_socket):
-    global on_match
-    global on_turn
-    while not stop_event.is_set() and on_match:
-        pass 
-
-def heartbeats():
+def heartbeats(address):
     ns = Pyro5.api.locate_ns()                           
-    uri = ns.lookup("ufv_wilds.server")            
+    uri = ns.lookup(address)            
     server = Pyro5.api.Proxy(uri)                         
     global stop_event
     global client_id
@@ -475,40 +269,63 @@ def heartbeats():
     
 #Start Client
 def start_client(host, port):
-    print("[*] Starting Up... Please wait...")
-    ns = Pyro5.api.locate_ns()                           
-    uri = ns.lookup("ufv_wilds.server")             
-    server = Pyro5.api.Proxy(uri)    
-    
     global stop_event
     global token
-    global username
-    global login_into_server
-    global on_match
-    global client_id         
+    global on_match        
     global message_queue
-    global response_queue   
+    global response_queue  
+    global client_uri 
     
-    client_id = server.set_connection()
-    if(not client_id):
+    print("[*] Starting Up... Please wait...")
+    try:
+        ns = Pyro5.api.locate_ns()                           
+        uri = ns.lookup("ufv_wilds.server")             
+        server = Pyro5.api.Proxy(uri)    
+        
+        client_id = server.set_connection()
+        if(not client_id):
+            stop_event.set()
+            return
+
+        print(f"[*] Connected to the server.")
+        print(f"[*] Client ID: {client_id}", flush=True)
+            
+        client_handler = Client()
+        client_daemon = Pyro5.api.Daemon()
+        client_uri = client_daemon.register(client_handler)
+        
+        print(f"[*] Generated Client URI: {client_uri}")
+        
+        unique_name = f"Client-Match {client_id}"
+        ns.register(unique_name, client_uri)
+        registered_uri = ns.lookup(unique_name)
+        print(f"[*] Registered URI: {registered_uri}")
+    except:
+        print("[*] Server not found.")
         stop_event.set()
         return
-
-    print(f"[*] Connected to the server.")
-    print(f"[*] Client ID: {client_id}", flush=True)
-        
+            
     file_checking(server, client_id)    
     
-    heartbeats_thread = threading.Thread(target=heartbeats)
+    
+    heartbeats_thread = threading.Thread(target=heartbeats, args=("ufv_wilds.server",))
     heartbeats_thread.start()
                   
     ui_thread = threading.Thread(target=startInterface, args=(message_queue, response_queue))
     ui_thread.start()
-          
+    
+    def request_loop():
+        def loop_condition():
+            global stop_event
+            return not stop_event.is_set()
+        client_daemon.requestLoop(loop_condition)
+    
+    loop_thread = threading.Thread(target=request_loop)
+    loop_thread.start()
+    
     try:
         while not stop_event.is_set():
             if(on_match):
-                match_handler(server)
                 sleep(1)
                 continue
             if not message_queue.empty():
@@ -517,7 +334,7 @@ def start_client(host, port):
                 if(message == "exit"):
                     stop_event.set()
                     break
-                package_message(message, server, token)
+                package_message(message, server)
                 sleep(0.25)
     except KeyboardInterrupt:
         print("\n[*] User interruption.")
@@ -530,6 +347,7 @@ def start_client(host, port):
         return
     
     heartbeats_thread.join()
+    loop_thread.join()
 
         
 # Aux Functions
@@ -555,20 +373,6 @@ def file_checking(server, client_id):
         b64_to_image(b64_file, path)
         sleep(0.2)
         
-    
-    
-        
-
-def match_search(token):
-    
-    if(not token):
-        return False, {"token": token, "message": "Not logged in", "command": "error"}
-    global searching_for_match
-    if(searching_for_match):
-        return False, {"token": token, "message": "Already searching for match", "command": "error"}
-    searching_for_match = True
-    return True, {"token": token, "message": "Match Search", "command": "match_search"} 
-
 def delete_deck(message, token):
     if(not token):
         return False, {"token": token, "message": "Not logged in", "command": "error"}
@@ -700,14 +504,6 @@ def list_files(directory):
         if os.path.isfile(file_path):
             files.append(item)
     return files
-
-def offline_commands():
-    while True:
-        offline_command = input("Enter 'exit' to close the client or 'start' to start the connection: ")
-        if(offline_command == "exit"):
-            return False
-        if(offline_command == "start"):
-            return True
 
 if __name__ == "__main__":
     global message_queue

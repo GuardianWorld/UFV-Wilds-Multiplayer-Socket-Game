@@ -377,7 +377,7 @@ def add_card_to_user(user_id, card_id):
         if(card_amount and card_amount[0] >= 3):
             conn.close()
             return {"status": 500, "message": "User already has 3 of this card", "command": "error"}
-        if(card_amount > 0):
+        if(card_amount and card_amount > 0):
             c.execute('''UPDATE user_cards SET amount = amount + 1 WHERE user_id = ? AND card_id = ?''', (user_id, card_id))
             conn.commit()
             conn.close()
@@ -388,6 +388,7 @@ def add_card_to_user(user_id, card_id):
         conn.close()
         return {"status": 200, "message": "Success", "command": "add_card_to_user"}
     except Exception as e:
+        print(str(e))
         return {"status": 500, "message": "failure to add card to user", "command": "error"}
 
 def check_user_has_card(user_id, card_id):
