@@ -194,8 +194,8 @@ def TelaCarregamento(janela, pathImagemTelaPrincipal, message_queue, response_qu
     texto_carregando = fonte.render('Carregando...', True, CINZA)
     texto_rect = texto_carregando.get_rect(center=(largura_tela // 2, altura_tela // 2))
 
+    message_queue.put("match_search")
     while True:
-        message_queue.put("match_search")
         
         janela.blit(imagem_fundo, (0, 0))  # Desenha a imagem de fundo
         janela.blit(texto_carregando, texto_rect)  # Desenha a mensagem "Carregando..."
@@ -340,7 +340,7 @@ def TelaPartida(janela, turnos, imagemPantano, message_queue, response_queue):
                 # Verificar se o botão de confirmação foi clicado
                 if atributo_selecionado == True:
                     if botao_confirmar.collidepoint(pos) and selecao is not None:
-                        message_queue.put(f"select_card {mao[selecao][1]}")
+                        message_queue.put(mao[selecao][1])
                         
                         while True:
                             for event in pygame.event.get():
@@ -442,7 +442,7 @@ def TelaVencedor(janela, vencedor, turno, jogo_completo, imagemPantano, message_
                     pygame.time.wait(intervalo_pausa)  # Pausa após as piscadas
                     if not recompensa == None:
                         message_queue.put(f"check_card {recompensa}")
-                        telaRecompensa(janela, response_queue.get()[7][1:],imagemPantano)
+                        telaRecompensa(janela, response_queue.get()[7],imagemPantano)
                     return  # Retorna após concluir a exibição
 
         pygame.display.flip()
@@ -589,7 +589,8 @@ def TelaSelecaoAtributo(janela, imagemPantano, message_queue, response_queue):
                                                   pos_y + len(atributos) * (ALTURA_BOTAO + MARGEM),
                                                   LARGURA_BOTAO, ALTURA_BOTAO)
                     if botao_confirmar.collidepoint(pos):
-                        message_queue.put(f"select_attribute {atributos[selecao]}")
+                        print(atributos[selecao])
+                        message_queue.put(atributos[selecao])
                         return True
 
 def TelaEscolherBaralho(janela, jogador, message_queue, response_queue):

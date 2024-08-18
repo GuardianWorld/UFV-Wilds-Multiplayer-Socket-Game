@@ -47,7 +47,7 @@ class UFVWildsServer:
         try:
             current_time = time.time()
             for client_id, _time in self.heartbeats.items():
-                if(current_time - _time > 5):
+                if(current_time - _time > 60):
                     print(f"[*] Client {client_id} timed out.")
                     self.logoff(client_id)
         except Exception as e:
@@ -111,12 +111,10 @@ class UFVWildsServer:
         if(status == 200):
             if(log_event_level >= 1):
                 print(f"[*] User {username} logged in.")
+                #print(f"[*] Token: {response.get('token')}")
             
             Token = response.get('token')
-            self.logged_users[client_id] = username
-            
-            for client_id, usr in self.logged_users.items():
-                print(usr)                
+            self.logged_users[client_id] = username             
             
             #Check if user has active decks.
             user_id = database.get_user_id(username)[0]
@@ -279,12 +277,20 @@ class UFVWildsServer:
     #match search
 
     def match_search(self, token, client_id, URI):
+        if(log_event_level >= 5):
+            print("====================================")
+            print("token:", token)
+            print("client_id: ", client_id)
+            print("URI:", URI)
+            print("====================================")
+        
         if(not token):
             return 500, "Invalid Token."
         
         username = self.logged_users[client_id]
         if not username:
             return 500, "Invalid User."
+        
         if(username in self.searching_for_match):
             return 500, "Already searching for match."
         
@@ -292,7 +298,6 @@ class UFVWildsServer:
         self.searching_for_match[username] = URI
         
         try:
-            print(f"[*] Sending match search request to {URI}")
             client_proxy = Pyro5.api.Proxy(URI)
             client_proxy.match_search()
         except Exception as e:

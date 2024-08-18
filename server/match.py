@@ -1,6 +1,5 @@
 import random
 import sys
-import socket
 import json
 import threading
 import time
@@ -14,7 +13,7 @@ def search_match(ufv_wilds_server):
     print("[*] Matchmaking Server Started.")
     matched_players = []
     while not stop_event.is_set():
-        #print(len(ufv_wilds_server.searching_for_match))
+        #print(len(ufv_wilds_server.searching_for_match))            
         if(len(ufv_wilds_server.searching_for_match) >= 3):
             matched_players = random.sample(list(ufv_wilds_server.searching_for_match.items()), 3)
             player1 = matched_players[0]
@@ -32,25 +31,16 @@ def search_match(ufv_wilds_server):
             time.sleep(3)
     print("[*] Matchmaking Server Stopped.")
 
-def waiting_for_match(player_name, player_socket):
-    searching_for_match[player_name] = player_socket
-    return {"status": 200, "message": "Searching for match...", "command": "match_wait"}
-
-def player_searching(player_name):
-    if player_name in searching_for_match:
-        return True
-    return False
-
-def player_in_match(player_name):
-    for match in match_rooms:
-        if player_name in match:
-            return True
-    return False
-
 def players_info(p1,p2,p3):
-    player1_id = database.get_user_id(p1[0])[0]
-    player2_id = database.get_user_id(p2[0])[0]
-    player3_id = database.get_user_id(p3[0])[0]    
+    player1_name, player1_URI = p1
+    player2_name, player2_URI = p2
+    player3_name, player3_URI = p3
+    client1_proxy = Pyro5.api.Proxy(player1_URI)
+    client2_proxy = Pyro5.api.Proxy(player2_URI)
+    client3_proxy = Pyro5.api.Proxy(player3_URI)
+    player1_id = database.get_user_id(player1_name)[0]
+    player2_id = database.get_user_id(player2_name)[0]
+    player3_id = database.get_user_id(player3_name)[0]    
     player1_deck = database.get_active_deck(player1_id)[0]
     player2_deck = database.get_active_deck(player2_id)[0]
     player3_deck = database.get_active_deck(player3_id)[0]
@@ -66,79 +56,31 @@ def players_info(p1,p2,p3):
     player3_hand = random.sample(player3_cards, 3)
     player3_cards = [card for card in player3_cards if card not in player3_hand]
     
-    player1 = {"name": p1[0], "URI": p1[1], "id": player1_id, "cards": player1_cards, "hand": player1_hand}
-    player2 = {"name": p2[0], "URI": p2[1], "id": player2_id, "cards": player2_cards, "hand": player2_hand}
-    player3 = {"name": p3[0], "URI": p3[1], "id": player3_id, "cards": player3_cards, "hand": player3_hand}
+    player1 = {"name": player1_name,"URI": player1_URI, "proxy": client1_proxy, "id": player1_id, "cards": player1_cards, "hand": player1_hand}
+    player2 = {"name": player2_name,"URI": player2_URI, "proxy": client2_proxy, "id": player2_id, "cards": player2_cards, "hand": player2_hand}
+    player3 = {"name": player3_name,"URI": player3_URI, "proxy": client3_proxy, "id": player3_id, "cards": player3_cards, "hand": player3_hand}
     
     return player1, player2, player3
 
 def get_attribute(player):
-    send_message(player, json.dumps({"status": 200, "message": "Select an attribute", "command": "select_attribute"}).encode())
-    while True:
-        try:
-            request = player['socket'].recv(8192)
-            data = json.loads(request.decode())
-            command = data.get('command')
-            if(command == "select_attribute"):
-                attribute = data.get('attribute')
-                if(attribute == "Forca" or
-                   attribute == "Fofura" or
-                   attribute == "Velocidade" or
-                   attribute == "Tamanho" or
-                   attribute == "Idade" or
-                   attribute == "Tipo"):
-                    return attribute
-                else:
-                    send_message(player, json.dumps({"status": 400, "message": "Invalid attribute", "command": "error"}).encode())
-            else:
-                send_message(player, json.dumps({"status": 400, "message": "Invalid command", "command": "error"}).encode())
-        except socket.timeout:
-            continue
-        except Exception as e:
-            print(str(e))
-            return None
+    request = player['proxy'].select_attribute()
+    try:
+        if(request != "Invalid"):
+            return request
+    except Exception as e:
+        print(str(e))
+        return None
 
 def get_played_card(player, attribute):
-    card_hand = []
-    for card_id in player['hand']:
-        card = database.get_card_by_id(card_id)
-        card_value = database.get_card_attribute(card_id, attribute)
-        card_hand.append((card, card_value))
+    response = player['proxy'].select_card(attribute)
     try:
-        send_message(player, json.dumps({"status": 200, "message": "Select a card", "command": "select_card", "hand": card_hand, "attribute": attribute}).encode())
+        card_id = database.get_card_id(response)[0]
+        
+        if(card_id in player['hand']):
+            card = database.get_card_by_id(card_id)
     except Exception as e:
         print(str(e))
         return None, None
-    
-    while True:
-        try:
-            request = player['socket'].recv(8192)
-            data = json.loads(request.decode())
-            command = data.get('command')
-            if(command == "select_card"):
-                card_name = data.get('card_name')
-                try:
-                    card_id = database.get_card_id(card_name)[0]
-                except:
-                    send_message(player, json.dumps({"status": 400, "message": "Invalid card", "command": "error"}).encode())
-                    continue
-                
-                if(card_id in player['hand']):
-                    card = database.get_card_by_id(card_id)
-                    break
-                else:
-                    send_message(player, json.dumps({"status": 400, "message": "Invalid card", "command": "error"}).encode())
-            elif(command == "check_card"):
-                card_name = data.get('card')
-                response = database.get_card_info(data.get('card_name'))
-                send_message(player, json.dumps(response).encode()) 
-            else:
-                send_message(player, json.dumps({"status": 400, "message": "Invalid command", "command": "error"}).encode())
-        except socket.timeout:
-            continue
-        except Exception as e:
-            print(str(e))
-            return None, None
     return card, player['name']
 
 def attribute_to_int(value, attribute):
@@ -172,7 +114,7 @@ def show_hand(player):
         card_hand.append(card)
     
     cards_in_deck = len(player['cards'])
-    send_message(player, json.dumps({"status": 200, "message": "Select a card", "command": "card_hand", "hand": card_hand, "cards": cards_in_deck}).encode())
+    player['proxy'].card_hand(cards_in_deck, card_hand)
     return
 
 def normal_attributes_fight(p1, p2, p3, attribute):
@@ -237,19 +179,19 @@ def winTurn(p1_card, p2_card, p3_card, win_player, second_player, third_player):
     win_player['cards'].append(p1_card[0])
     win_player['cards'].append(p2_card[0])
     win_player['cards'].append(p3_card[0])
-    send_message(win_player, json.dumps({"status": 200, "message": "You won this turn!", "command": "turn_end", "winner": p1_name}).encode())
-    send_message(second_player, json.dumps({"status": 200, "message": "You lost this turn!", "command": "turn_end", "winner": p1_name}).encode())
-    send_message(third_player, json.dumps({"status": 200, "message": "You lost this turn!", "command": "turn_end", "winner": p1_name}).encode())
+    win_player['proxy'].turn_end(p1_name)
+    second_player['proxy'].turn_end(p1_name)
+    third_player['proxy'].turn_end(p1_name)
     
     return win_player
     
 
 def turn(first_player, second_player, third_player):    
     
-    send_message(first_player, json.dumps({"status": 200, "message": "Your turn", "command": "your_turn", "hand": first_player['hand']}).encode())
-    send_message(second_player, json.dumps({"status": 200, "message": f"{first_player['name']} turn", "command": "opponent_turn", "hand": second_player['hand']}).encode())
-    send_message(third_player, json.dumps({"status": 200, "message": f"{first_player['name']} turn", "command": "opponent_turn", "hand": third_player['hand']}).encode())
-    
+    first_player['proxy'].your_turn()
+    second_player['proxy'].opponent_turn()
+    third_player['proxy'].opponent_turn()
+
     show_hand(first_player)
     show_hand(second_player)
     show_hand(third_player)
@@ -283,7 +225,7 @@ def turn(first_player, second_player, third_player):
     return first_player, second_player, third_player
 
 def match_end(p1, p2, p3):
-    if(len(p1['cards']) == 0 or len(p2['cards']) == 0 or len(p3['cards']) == 0):
+    if(len(p1['cards']) == 5 or len(p2['cards']) == 5 or len(p3['cards']) == 5):
         return True
     return False
 
@@ -323,22 +265,11 @@ def play_order(p1, p2, p3):
     
     return first_player, second_player, third_player
 
-def send_error(p1):
+def send_error(p1, URI):
     try:
-        p1['socket'].send(json.dumps({"status": 400, "message": "An error occurred during the match", "command": "match_end"}).encode())
+        p1['proxy'].match_end(URI)
     except:
         pass
-
-def send_message(player, encoded_message):
-    try:
-        socket = player['socket']
-        if(socket == None):
-            socket = player
-        socket.send(encoded_message)
-    except:
-        return False
-    time.sleep(delay_for_lag)
-    return True
 
 def play_field(p1, p2, p3): 
     
@@ -348,12 +279,11 @@ def play_field(p1, p2, p3):
     if(log_event_level >= 4):
         print(f"[*] Match started between {player1['name']}, {player2['name']} and {player3['name']}")
     
-    send_message(player1, json.dumps({"status": 200, "message": "match", "command": "match_start", "player_1": player1['name'], "player_2": player2['name'], "player_3": player3['name']}).encode())
-    send_message(player2, json.dumps({"status": 200, "message": "match", "command": "match_start", "player_1": player1['name'], "player_2": player2['name'], "player_3": player3['name']}).encode())
-    send_message(player3, json.dumps({"status": 200, "message": "match", "command": "match_start", "player_1": player1['name'], "player_2": player2['name'], "player_3": player3['name']}).encode())
-    
+    player1['proxy'].match_start(player1['name'], player2['name'], player3['name'])
+    player2['proxy'].match_start(player1['name'], player2['name'], player3['name'])
+    player3['proxy'].match_start(player1['name'], player2['name'], player3['name'])
+  
     should_end = False
-    
     error = False
     
     while not stop_event.is_set() and not should_end:
@@ -363,7 +293,6 @@ def play_field(p1, p2, p3):
             
             if(first_player == None or second_player == None or third_player == None):
                 error = True
-                
                 break   
                 
             aux_player = first_player
@@ -384,17 +313,17 @@ def play_field(p1, p2, p3):
         print("[*] Match ended.")
         
     if(error):
-        send_error(player1)
-        send_error(player2)
-        send_error(player3)
+        send_error(player1, player1["URI"])
+        send_error(player2, player2["URI"])
+        send_error(player3, player3["URI"])
         match_rooms.remove((player1['name'],player2['name'], player3['name']))
         return
     
     winner_player, l1, l2 = check_winner(first_player, second_player, third_player)
     
-    send_message(winner_player, json.dumps({"status": 200, "message": "You won!", "command": "match_end"}).encode())
-    send_message(l1, json.dumps({"status": 200, "message": "You lost!", "command": "match_end"}).encode())
-    send_message(l2, json.dumps({"status": 200, "message": "You lost!", "command": "match_end"}).encode())
+    winner_player['proxy'].match_end()
+    l1['proxy'].match_end()
+    l2['proxy'].match_end()
 
     full_deck = l1['cards'] + l2['cards']
     reward_card = None
@@ -409,23 +338,18 @@ def play_field(p1, p2, p3):
                 amount = 0
             else:
                 amount = amount[0]
-                
+            
             if amount < 3:
                 database.add_card_to_user(winner_player['id'], reward_card)
                 reward_card_name = database.get_card_by_id(reward_card)[1]
-                send_message(winner_player, json.dumps({"status": 200, "message": "You won a card!", "command": "reward", "card": reward_card_name}).encode())
+                winner_player['proxy'].reward(reward_card_name)
                 break
-            if len(full_deck) == 0:
-                send_message(winner_player, json.dumps({"status": 200, "message": "You won a card!", "command": "reward", "card": "You have all cards on the reward table"}).encode())
+            if len(full_deck) == 0: 
                 break
         except Exception as e:
             print(str(e))
             break
     
-    
-    first_player['socket'].settimeout(5)
-    second_player['socket'].settimeout(5)
-    third_player['socket'].settimeout(5)
     #remove from match_rooms
     match_rooms.remove((player1['name'],player2['name'], player3['name']))
     return

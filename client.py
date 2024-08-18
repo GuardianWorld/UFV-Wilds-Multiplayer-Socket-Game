@@ -21,8 +21,6 @@ searching_for_match = False
 on_match = False
 downloading_file = False
 client_id = ""
-ns = None
-client_uri = None
 
 @Pyro5.api.expose
 class Client:
@@ -37,26 +35,35 @@ class Client:
         print(f"[*] Match started between {player_1}, {player_2} and {player_3}")
         response_queue.put(["Match started", player_1, player_2, player_3])
         on_match = True
-    def match_end(self, client_handler):
+    def match_end(self):
+        global on_match
+        
         print("[*] Match ended.")
         response_queue.put("Match ended")
-        Pyro5.api.Daemon().unregister(client_handler)
         on_match = False
     def select_attribute(self):
-        global on_turn
         print("[*] Select an attribute.")
         response_queue.put("Select attribute")
+        while(True):
+            request = message_queue.get()
+            print(f"[*] Selected attribute: {request}")
+            if(request == "Forca" or request == "Fofura" or request == "Velocidade" or request == "Tamanho" or request == "Idade" or request == "Tipo"):
+                return request
+        return "Invalid"
     def select_card(self, attribute):
         response_queue.put("Select card")
         response_queue.put(attribute)
+        response = message_queue.get()
+        print(f"[*] Selected card: {response}")
+        return response
     def your_turn(self):
         response_queue.put("Your turn")
     def opponent_turn(self):
         response_queue.put("Opponent turn")
     def turn_end(self, winner):
         response_queue.put(["Turn ended", winner])
-    def card_hand(self, hand):
-        response_queue.put(hand)
+    def card_hand(self, cards, hand):
+        response_queue.put([cards,hand])
     def reward(self, reward):
         response_queue.put(reward)
     def error(self, message):
@@ -72,10 +79,9 @@ def close_connection(client_socket):
     client_socket.close()
  
 def common_commands(message, server):
+    global username
     global token
     global on_match
-    global username
-    global client_id
     full_message = message.split(' ', 1)
     command = full_message[0]
     
@@ -225,25 +231,23 @@ def common_commands(message, server):
         response_queue.put(["Card removed", card_name, deck_name])
     
     elif(command == "exit"):
-        response = server.logoff(client_id,token)
+        response = server.logoff(client_id)
     elif(command == "match_search"):
         on_match = True
 
         
         try:
-            global client_uri
             status, response = server.match_search(token, client_id, client_uri)
+            print(f"[*] Match Search: {status}")
+            print(f"[*] Match Search Response: {response}")
         except Exception as e:
             print(f"[*] Match Search Exception: {str(e)}")
             on_match = False
             exit(0)
-        
-        
-        
+             
 
 def package_message(message, server):
     global searching_for_match
-    global on_match
         
     try:
         common_commands(message, server)
@@ -257,8 +261,6 @@ def heartbeats(address):
     ns = Pyro5.api.locate_ns()                           
     uri = ns.lookup(address)            
     server = Pyro5.api.Proxy(uri)                         
-    global stop_event
-    global client_id
     while not stop_event.is_set():
         try:
             server.update_heartbeat(client_id)
@@ -270,11 +272,10 @@ def heartbeats(address):
 #Start Client
 def start_client(host, port):
     global stop_event
-    global token
-    global on_match        
-    global message_queue
-    global response_queue  
-    global client_uri 
+    global token     
+    global client_uri
+    global client_handler 
+    global client_id
     
     print("[*] Starting Up... Please wait...")
     try:
@@ -283,6 +284,7 @@ def start_client(host, port):
         server = Pyro5.api.Proxy(uri)    
         
         client_id = server.set_connection()
+        
         if(not client_id):
             stop_event.set()
             return
@@ -316,7 +318,6 @@ def start_client(host, port):
     
     def request_loop():
         def loop_condition():
-            global stop_event
             return not stop_event.is_set()
         client_daemon.requestLoop(loop_condition)
     
