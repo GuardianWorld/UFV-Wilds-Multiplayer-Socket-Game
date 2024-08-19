@@ -69,14 +69,6 @@ class Client:
     def error(self, message):
         response_queue.put(["Error", message])
         
-    
-    
-    
-    
-
-def close_connection(client_socket):
-    print("[*] Disconnected from server.")
-    client_socket.close()
  
 def common_commands(message, server):
     global username
@@ -257,8 +249,8 @@ def package_message(message, server):
     
     return
 
-def heartbeats(address):
-    ns = Pyro5.api.locate_ns()                           
+def heartbeats(address, host, port):
+    ns = Pyro5.api.locate_ns(host=host, port=port)                           
     uri = ns.lookup(address)            
     server = Pyro5.api.Proxy(uri)                         
     while not stop_event.is_set():
@@ -279,7 +271,7 @@ def start_client(host, port):
     
     print("[*] Starting Up... Please wait...")
     try:
-        ns = Pyro5.api.locate_ns()                           
+        ns = Pyro5.api.locate_ns(host=host, port=port)                           
         uri = ns.lookup("ufv_wilds.server")             
         server = Pyro5.api.Proxy(uri)    
         
@@ -310,7 +302,7 @@ def start_client(host, port):
     file_checking(server, client_id)    
     
     
-    heartbeats_thread = threading.Thread(target=heartbeats, args=("ufv_wilds.server",))
+    heartbeats_thread = threading.Thread(target=heartbeats, args=("ufv_wilds.server",host, port))
     heartbeats_thread.start()
                   
     ui_thread = threading.Thread(target=startInterface, args=(message_queue, response_queue))
@@ -333,6 +325,7 @@ def start_client(host, port):
                 message = message_queue.get()
                 print("enviado:", message)
                 if(message == "exit"):
+                    server.logoff(client_id)
                     stop_event.set()
                     break
                 package_message(message, server)
@@ -373,79 +366,7 @@ def file_checking(server, client_id):
         b64_file = server.request_file(client_id, file[0])
         b64_to_image(b64_file, path)
         sleep(0.2)
-        
-def delete_deck(message, token):
-    if(not token):
-        return False, {"token": token, "message": "Not logged in", "command": "error"}
-    
-    parts = message.split(' ', 2)
-    if(len(parts) != 2):
-        return False, {"token": token, "message": "Invalid input", "command": "error"}
-    
-    deck_name = parts[1]
-    return True, {"token": token, "message": "Deleting deck", "command": "delete_deck", "deck_name": deck_name}    
-
-def add_card_to_deck(message, token):
-    if(not token):
-        return False, {"token": token, "message": "Not logged in", "command": "error"}
-    
-    parts = message.split(' ', 2)
-
-    if(len(parts) != 3):
-        return False, {"token": token, "message": "Invalid input", "command": "error"}
-    
-    deck_name = parts[1]
-    card_name = parts[2]
-    
-    return True, {"token": token, "message": "Adding card to deck", "command": "add_card_to_deck", "deck_name": deck_name, "card_name": card_name}
-
-def remove_card_from_deck(message, token):
-    if(not token):
-        return False, {"token": token, "message": "Not logged in", "command": "error"}
-    
-    parts = message.split(' ', 2)
-    if(len(parts) != 3):
-        return False, {"token": token, "message": "Invalid input", "command": "error"}
-    
-    deck_name = parts[1]
-    card_name = parts[2]
-    
-    return True, {"token": token, "message": "Removing card from deck", "command": "remove_card_from_deck", "deck_name": deck_name, "card_name": card_name}
-                      
-def download_files(client_socket, missing_indexes, amount, server_files, token):
-    x = 0
-    for index in missing_indexes:
-        file = server_files[index]
-
-        package = json.dumps({"token": token, "message": "", "command": "download_images", "image_path": file[0]})
-        client_socket.send(package.encode())
-        print(f"[*] Requesting file: {file[0]} {x} / {amount}")
-
-        try:
-            data = b""
-            while True:
-                part = client_socket.recv(8192) 
-                if not part:
-                    break
-                data += part
-                try:
-                    file_data_json = json.loads(data.decode())
-                    break
-                except json.JSONDecodeError:
-                    continue 
-            if file_data_json.get('command') == "file_download":
-                path = os.path.join(os.getcwd(), "StreamingAssets", file[0])
-                if os.name == 'nt':
-                    path = path.replace("/", "\\")
-                imageb64 = file_data_json.get('imageb64')
-                b64_to_image(imageb64, path)
-                # print(f"[*] File {path} downloaded.")
-                x += 1
-        except Exception as e:
-            # print(f"[*] Download Exception: {str(e)}")
-            response_queue.put(["Download exception", str(e)])
-            break
-                    
+                          
 def verify_files(server_files):    
     missing_indexes = []
     missing_files = 0
@@ -475,7 +396,6 @@ def verify_files(server_files):
                 response_queue.put(["File outdated or corrupted.", file_name])
 
     return missing_files, missing_indexes
-
 
 #Image functions
 def b64_to_image(b64_string, image_path):

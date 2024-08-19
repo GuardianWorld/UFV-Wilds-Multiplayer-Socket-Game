@@ -8,11 +8,7 @@ Primeiro:
 
 Então vamos la!
 
-Em um terminal, faça o pyro nameserver iniciar:
-
-> make pyro
-
-A seguir, faça o comando:
+Faça o comando:
 
 > make server
 
@@ -22,6 +18,6 @@ então:
 
 >make client
 
-client vai fazer o jogo com UI
+vai fazer o jogo com UI
 
 Para jogar pela UI, basta registrar e logar com uma conta, e em seguida ver seu deck ou começar uma partida! Quando três jogadores aparecerem, uma partida ira começar!

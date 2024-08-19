@@ -11,6 +11,7 @@ import hashlib
 import base64
 import os
 import Pyro5.api
+import Pyro5.nameserver
 import queue
 
 
@@ -36,13 +37,11 @@ class UFVWildsServer:
         self.searching_for_match = {}
 
     #Connection Management
-
     def set_connection(self):
         #make unique ID
         client_id = hashlib.md5(str(datetime.datetime.now()).encode()).hexdigest()
         self.clients.append(client_id)
         return client_id
-    
     def heartbeats_check(self):
         try:
             current_time = time.time()
@@ -51,9 +50,7 @@ class UFVWildsServer:
                     print(f"[*] Client {client_id} timed out.")
                     self.logoff(client_id)
         except Exception as e:
-            pass
-            
-                
+            pass             
     def update_heartbeat(self, client_id):
         try:
             current_time = time.time()
@@ -97,8 +94,7 @@ class UFVWildsServer:
             
         database.make_deck_active(user_id, deck_id)
         
-        return 200, f"User {username} registered sucessfully."
-            
+        return 200, f"User {username} registered sucessfully."       
     def login(self, username, password, client_id):
         if(log_event_level >= 1):
             print(f"[*] Login request received, User: {username}")
@@ -123,7 +119,6 @@ class UFVWildsServer:
                 database.make_deck_active(user_id, deck_id)
                 
         return status, Token
-    
     def logoff(self, client_id):
         username = ""
         print(f"[*] Logoff request received from {client_id}")
@@ -161,7 +156,6 @@ class UFVWildsServer:
             card_list.append((card_name, card_amount))
             
         return 200, card_list
-    
     def check_card(self, token, card_name):
         if(not token):
             return 500, "Invalid Token."
@@ -169,7 +163,6 @@ class UFVWildsServer:
         response = database.get_card_info(card_name)    
         card = [response["card_name"], response["card_group"], response["forca"], response["fofura"], response["velocidade"], response["tamanho"], response["idade"], response["tipo"], response["imagem"]]
         return 200, card
-    
     def check_decks(self, token):
         if(not token):
             return 500, "Invalid Token."
@@ -179,7 +172,6 @@ class UFVWildsServer:
             return 500, "Invalid Token."
         decks = database.get_user_decks(user_id)
         return 200, decks
-    
     def check_deck(self, token, deck_name):
         if(not token):
             return 500, "Invalid Token."
@@ -193,7 +185,6 @@ class UFVWildsServer:
         response = database.get_deck_info(token, deck_id[0])
         deck_info = [deck_name, response['cards'], response['active']]
         return 200, deck_info
-    
     def activate_deck(self, token, deck_name):
         if(not token):
             return 500, "Invalid Token."
@@ -208,7 +199,6 @@ class UFVWildsServer:
         if(response['status'] == 200):
             return 200, "Deck activated."
         return 500, "Error activating deck."
-    
     def create_deck(self, token, deck_name):
         if(not token):
             return 500, "Invalid Token."
@@ -217,8 +207,7 @@ class UFVWildsServer:
         response = database.add_deck(user_id, deck_name)
         if(response['status'] == 200):
             return 200, "Deck created."
-        return 500, "Error creating deck."
-    
+        return 500, "Error creating deck."  
     def delete_deck(self, token, deck_name):
         if(not token):
             return 500, "Invalid Token."
@@ -232,8 +221,7 @@ class UFVWildsServer:
         response = database.delete_deck(deck_id[0])
         if(response['status'] == 200):
             return 200, "Deck deleted."
-        return 500, "Error deleting deck."
-    
+        return 500, "Error deleting deck." 
     def add_card_to_deck(self, token, deck_name, card_name):
         if(not token):
             return 500, "Invalid Token."
@@ -255,7 +243,6 @@ class UFVWildsServer:
         if(response['status'] == 200):
             return 200, "Card added to deck."
         return 500, "Error adding card to deck."
-    
     def remove_card_from_deck(self, token, deck_name, card_name):
         if(not token):
             return 500, "Invalid Token."
@@ -313,7 +300,6 @@ class UFVWildsServer:
         if(client_id):
             return files
         return None
-    
     def request_file(self, client_id, image_path):
         if(log_event_level >= 5):
             print(f"[*] Image request received from {client_id}")
@@ -329,9 +315,32 @@ def heartbeat_thread(server):
         server.heartbeats_check()
         time.sleep(5)
 
+def nameserver_thread(host, port):
+    Pyro5.nameserver.start_ns_loop(host=host, port=port)
+    
+
+def nameserver_avaliable(host, port):
+    try:
+        Pyro5.api.locate_ns(host=host, port=port)
+        return True
+    except Pyro5.errors.NamingError:
+        print("[*] Waiting for NameServer...", flush=True)
+        return False
+    
+
 #Start Server
 def start_server(host, port):
-    print("[*] Starting server...")
+    
+    print("[*] Starting NameServer...\n")
+    
+    nameserver = threading.Thread(target=nameserver_thread, args=(host, port))
+    nameserver.daemon = True
+    nameserver.start()
+    
+    while not nameserver_avaliable(host, port):
+        time.sleep(1)
+    
+    print("\n[*] Starting server...")
     print("[*] Loading StreamingAssets...")
     time.sleep(1)
     list_files(getcwd() + "/StreamingAssets")
@@ -351,12 +360,16 @@ def start_server(host, port):
     print(f"[*] Log Level: {log_event_level}")  
     
     #Pyro Server
-    daemon = Pyro5.api.Daemon(host=host, port=port)
-    ns = Pyro5.api.locate_ns()
+    try:
+        daemon = Pyro5.api.Daemon()
+        ns = Pyro5.api.locate_ns(host=host, port=port)
     
-    ufv_wilds_server = UFVWildsServer()
-    uri = daemon.register(ufv_wilds_server)
-    ns.register("ufv_wilds.server", uri)
+        ufv_wilds_server = UFVWildsServer()
+        uri = daemon.register(ufv_wilds_server)
+        ns.register("ufv_wilds.server", uri)
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        shutdown_server(1)
     
     terminal = threading.Thread(target=internal_server_terminal, args=(ufv_wilds_server,))
     terminal.start()
@@ -367,6 +380,9 @@ def start_server(host, port):
     heartbeat = threading.Thread(target=heartbeat_thread, args=(ufv_wilds_server,))
     heartbeat.start()
     
+    print("[*] Initialization Done.")
+    print(">> Type 'shutdown' to stop the server.")
+    print(">> Type 'help' for available commands.")
     def loop_condition():
         global stop_event
         return not stop_event.is_set()
@@ -375,10 +391,11 @@ def start_server(host, port):
     daemon.requestLoop(loop_condition)
     
     terminal.join()
-    #match_thread.join()
+    match_thread.join()
     heartbeat.join()
+    nameserver.join()
     
-    shutdown_server(1)
+    shutdown_server(3)
 
 #Shutdown Server
 def shutdown_server(timeout=5):
@@ -394,7 +411,7 @@ def internal_server_terminal(ufv_wilds_server):
     print("[*] Server terminal started.")
     while not stop_event.is_set():
         try:
-            command = input(" >> ")
+            command = input("")
             if command == "shutdown":
                 print("[*] Shutdown command issued, stopping...")
                 stop_event.set()
@@ -522,7 +539,7 @@ def terminal_matches():
 
 def terminal_searching(searching_for_match):
     print(f"[*] Searching for match: {len(searching_for_match)}")
-    for player, player_socket in searching_for_match.items():
+    for player, _ in searching_for_match.items():
         print(f" -> {player}")
 
 def terminal_search():
@@ -811,7 +828,7 @@ if __name__ == "__main__":
     parser.add_argument("-H", "--host", default="localhost", help="The host to bind the server to. Default is connection to LocalHost")
     parser.add_argument("-p", "--port", type=int, default=25555, help="The port to bind the server to. Default is 25555.")
     parser.add_argument("-l", "--log", type=int, default=4, help="The log event level. Default is 4 (Player Logins + Register + Matches + Connections). Maximum is 5.")
-    parser.add_argument("-dl", "--delay", type=float, default=0.1, help="The delay between socket messages. Default is 0.1 seconds.")
+    parser.add_argument("-dl", "--delay", type=float, default=0.1, help="The delay between messages. Default is 0.1 seconds.")
     
     args = parser.parse_args()
     
